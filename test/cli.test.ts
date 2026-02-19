@@ -4,6 +4,9 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
+const projectRoot = path.resolve(__dirname, "..");
+const cliPath = path.join(projectRoot, "dist", "cli.js");
+
 describe("CLI Integration", () => {
   let tmpDir: string;
 
@@ -16,14 +19,14 @@ describe("CLI Integration", () => {
   });
 
   it("cli --help shows usage", () => {
-    const result = execSync("npx tsx src/cli.ts --help", {
-      cwd: "/home/user/chrome-ranger",
+    const result = execSync(`node ${cliPath} --help`, {
+      cwd: projectRoot,
     }).toString();
     expect(result).toContain("chrome-ranger");
   });
 
   it("init creates chrome-ranger.yaml", () => {
-    execSync("npx tsx /home/user/chrome-ranger/src/cli.ts init", {
+    execSync(`node ${cliPath} init`, {
       cwd: tmpDir,
     });
     expect(fs.existsSync(path.join(tmpDir, "chrome-ranger.yaml"))).toBe(true);
@@ -32,7 +35,7 @@ describe("CLI Integration", () => {
   it("init refuses overwrite without --force", () => {
     fs.writeFileSync(path.join(tmpDir, "chrome-ranger.yaml"), "existing");
     expect(() =>
-      execSync("npx tsx /home/user/chrome-ranger/src/cli.ts init", {
+      execSync(`node ${cliPath} init`, {
         cwd: tmpDir,
         stdio: "pipe",
       })
@@ -41,7 +44,7 @@ describe("CLI Integration", () => {
 
   it("init --force overwrites", () => {
     fs.writeFileSync(path.join(tmpDir, "chrome-ranger.yaml"), "old");
-    execSync("npx tsx /home/user/chrome-ranger/src/cli.ts init --force", {
+    execSync(`node ${cliPath} init --force`, {
       cwd: tmpDir,
     });
     const content = fs.readFileSync(
