@@ -50,7 +50,7 @@ The script's stdout and stderr are captured verbatim. The CLI does not parse or 
     {id}.stdout            # raw stdout per run
     {id}.stderr            # raw stderr per run
   worktrees/
-    {ref}/                 # git worktrees, managed by CLI
+    {ref}/                 # git worktrees, managed by CLI (slashes replaced with hyphens; disambiguated on collision)
 
 ~/.cache/chrome-ranger/    # system-level, shared across projects
   chrome-120.0.6099.109/   # respects XDG_CACHE_HOME
@@ -117,20 +117,20 @@ chrome-ranger cache clean                                 # remove cached Chrome
 1. Acquire lockfile (`.chrome-ranger/lock`). If already locked, fail immediately with an error — concurrent runs against the same project are not supported.
 2. Parse config, load `runs.jsonl`
 3. Compute full matrix: `chrome.versions × code.refs × [0..iterations)`
-4. Subtract completed runs → pending list. A cell is "complete" only when it has a run with `exitCode: 0`. Failed runs (non-zero exit) stay in `runs.jsonl` as history but don't count toward completion.
+4. Subtract completed runs → pending list. A cell is identified by `(chrome version, resolved SHA)` — if a branch advances to a new commit, old runs don't count. A cell is "complete" only when it has a run with `exitCode: 0`. Failed runs (non-zero exit) stay in `runs.jsonl` as history but don't count toward completion.
 5. For each code ref: resolve SHA, create/reuse git worktree
 6. For each Chrome version: ensure binary is downloaded and cached (via `@puppeteer/browsers`)
-7. For each worktree that will be used: run `setup` command if configured (once per worktree, skip if already set up for this SHA). `setup` runs with `cwd` set to the worktree directory. If setup fails for a ref, log the error and skip all iterations for that ref — other refs continue.
-8. For each (chrome, ref) cell: run warmup iterations. Warmup output is completely discarded (not written to `runs.jsonl` or the output directory). If a warmup iteration fails (non-zero exit), skip all remaining iterations for that cell and log a warning.
+7. For each worktree that will be used: run `setup` command if configured (once per worktree, skip if already set up for this SHA). Setup tracking: after a successful setup, write a marker file `.chrome-ranger-setup-done` containing the SHA into the worktree. On subsequent runs, compare the marker SHA to the current resolved SHA — only re-run setup if they differ. `setup` runs with `cwd` set to the worktree directory. If setup fails for a ref, log the error and skip all iterations for that ref — other refs continue.
+8. Run all warmup iterations first, before any real iterations. Warmups are parallelized across workers just like real iterations. Warmup count is per (chrome, ref) cell — `warmup: 1` with a 2×2 matrix = 4 warmup iterations total. Warmup output is completely discarded (not written to `runs.jsonl` or the output directory). If a warmup iteration fails (non-zero exit), skip all remaining iterations for that cell and log a warning.
 9. Dispatch pending runs across `workers` parallel workers:
    - Each worker picks the next pending run from the queue
    - Spawns `command` via shell with `cwd` set to `CODE_DIR` (the worktree) and env vars set
    - Captures stdout/stderr to `.chrome-ranger/output/{id}.*`
    - Appends metadata line to `runs.jsonl` (serialized — one writer)
    - Run IDs are generated via `crypto.randomUUID()`
-   - Prints progress: `[3/45] chrome@121 × main (e7f8a9b) #2`
-10. `--append N` skips the diff, just adds N runs to the specified cells
-11. `--replace` deletes existing runs for the targeted cells before running
+   - Prints progress: `[3/45] chrome@121 × main (e7f8a9b) #2` (where `#2` is the `ITERATION` value)
+10. `--append N` skips the diff, just adds N runs to the specified cells. Iteration numbering continues from the last iteration index (e.g., if a cell has iterations 0-4, appended runs start at iteration 5).
+11. `--replace` deletes existing runs for the targeted cells before running — both metadata lines from `runs.jsonl` and corresponding output files (`{id}.stdout`, `{id}.stderr`) are removed. Iteration numbering resets to 0 for replaced cells.
 12. `--chrome` and `--refs` filters scope everything: `--replace` only clears targeted cells, `--append` only adds to targeted cells
 13. Release lockfile on exit.
 
@@ -140,7 +140,7 @@ Workers run iterations concurrently up to the configured `workers` count. Each w
 
 ### Signal Handling
 
-On SIGINT/SIGTERM: kill in-flight iterations immediately. Do not write partial results. `runs.jsonl` only contains entries from iterations that completed before the signal. The lockfile is released on exit.
+On SIGINT/SIGTERM: kill in-flight iterations immediately. Do not write partial results. The commit point is the flush to `runs.jsonl` — if a metadata line was flushed to disk before the signal arrived, it stays; if not, it's discarded. The lockfile is released on exit.
 
 ### Concurrency
 
