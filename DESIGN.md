@@ -120,11 +120,11 @@ chrome-ranger cache clean                                 # remove cached Chrome
 4. Subtract completed runs → pending list. A cell is "complete" only when it has a run with `exitCode: 0`. Failed runs (non-zero exit) stay in `runs.jsonl` as history but don't count toward completion.
 5. For each code ref: resolve SHA, create/reuse git worktree
 6. For each Chrome version: ensure binary is downloaded and cached (via `@puppeteer/browsers`)
-7. For each worktree that will be used: run `setup` command if configured (once per worktree, skip if already set up for this SHA). If setup fails for a ref, log the error and skip all iterations for that ref — other refs continue.
+7. For each worktree that will be used: run `setup` command if configured (once per worktree, skip if already set up for this SHA). `setup` runs with `cwd` set to the worktree directory. If setup fails for a ref, log the error and skip all iterations for that ref — other refs continue.
 8. For each (chrome, ref) cell: run warmup iterations. Warmup output is completely discarded (not written to `runs.jsonl` or the output directory). If a warmup iteration fails (non-zero exit), skip all remaining iterations for that cell and log a warning.
 9. Dispatch pending runs across `workers` parallel workers:
    - Each worker picks the next pending run from the queue
-   - Spawns `command` via shell with env vars set
+   - Spawns `command` via shell with `cwd` set to `CODE_DIR` (the worktree) and env vars set
    - Captures stdout/stderr to `.chrome-ranger/output/{id}.*`
    - Appends metadata line to `runs.jsonl` (serialized — one writer)
    - Run IDs are generated via `crypto.randomUUID()`
