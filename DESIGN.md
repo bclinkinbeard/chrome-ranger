@@ -104,12 +104,13 @@ interface RunMeta {
 
 ```
 chrome-ranger init [--force]                               # scaffold config (refuses if exists; --force overwrites)
-chrome-ranger run [--chrome <v>] [--refs <ref>]           # fill cells to minimum
+chrome-ranger run [--chrome <v>]... [--refs <ref>]...      # fill cells to minimum (flags repeat for multiple values)
                   [--append N]                             # add N more runs to targeted cells
                   [--replace]                              # clear targeted cells, then run
 chrome-ranger status                                      # matrix completion table
 chrome-ranger list-chrome [--latest N] [--since DATE]     # query Chrome for Testing API (stable channel only)
 chrome-ranger cache clean                                 # remove all cached Chrome binaries
+chrome-ranger clean                                       # remove worktrees (.chrome-ranger/worktrees/)
 ```
 
 ## Run Behavior
@@ -118,7 +119,7 @@ chrome-ranger cache clean                                 # remove all cached Ch
 2. Parse config, load `runs.jsonl`
 3. Compute full matrix: `chrome.versions × code.refs × [0..iterations)`
 4. Subtract completed runs → pending list. A cell is identified by `(chrome version, resolved SHA)` — if a branch advances to a new commit, old runs don't count. A cell is "complete" only when it has a run with `exitCode: 0`. Failed runs (non-zero exit) stay in `runs.jsonl` as history but don't count toward completion.
-5. For each code ref: resolve SHA, create/reuse git worktree
+5. For each code ref: resolve SHA, create/reuse git worktree. All refs get worktrees — even if a ref points to the current HEAD, a worktree is still created to avoid modifying the user's working directory.
 6. For each Chrome version: ensure binary is downloaded and cached (via `@puppeteer/browsers`). Version strings must be exact (e.g., `"120.0.6099.109"`); no prefix matching. Use `list-chrome` to discover available versions.
 7. For each worktree that will be used: run `setup` command if configured (once per worktree, skip if already set up for this SHA). Setup tracking: after a successful setup, write a marker file `.chrome-ranger-setup-done` containing the SHA into the worktree. On subsequent runs, compare the marker SHA to the current resolved SHA — only re-run setup if they differ. `setup` runs with `cwd` set to the worktree directory. If setup fails for a ref, log the error and skip all iterations for that ref — other refs continue.
 8. Run all warmup iterations first, before any real iterations. Warmups are parallelized across workers just like real iterations. Warmup count is per (chrome, ref) cell — `warmup: 1` with a 2×2 matrix = 4 warmup iterations total. Warmup output is completely discarded (not written to `runs.jsonl` or the output directory). If a warmup iteration fails (non-zero exit), skip all remaining iterations for that cell and log a warning.
@@ -144,6 +145,10 @@ Workers run iterations concurrently up to the configured `workers` count. Each w
 
 On SIGINT/SIGTERM: kill in-flight iterations immediately. Do not write partial results. The commit point is the flush to `runs.jsonl` — if a metadata line was flushed to disk before the signal arrived, it stays; if not, it's discarded. The lockfile is released on exit.
 
+### Worktree Lifecycle
+
+Worktrees persist across runs and are never removed automatically. This avoids re-running `setup` (e.g., `npm ci`) unnecessarily. To reclaim disk space, use `chrome-ranger clean` which removes all worktrees in `.chrome-ranger/worktrees/` and prunes them from git.
+
 ### Concurrency
 
 Running two `chrome-ranger run` processes against the same project is not supported. A lockfile at `.chrome-ranger/lock` prevents this — the second invocation fails immediately with a clear error message.
@@ -161,7 +166,7 @@ Chrome 122    0/5               0/5
 
 ## Error Output
 
-Errors are written to stderr with a prefix: `error: <message>`. No stack traces unless `DEBUG=chrome-ranger` is set. Non-error progress output (resolving refs, setup status, iteration progress) goes to stderr as well, keeping stdout clean.
+All CLI output goes to stderr — errors, progress, and status messages. This keeps stdout completely clean for composability with pipes. Errors use a prefix: `error: <message>`. No stack traces unless `DEBUG=chrome-ranger` is set.
 
 ## Tech Stack
 

@@ -41,8 +41,9 @@ Design phase. No implementation code exists yet. The design is documented in DES
 
 ## CLI commands
 
-- `chrome-ranger init` — scaffold config
+- `chrome-ranger init [--force]` — scaffold config (refuses if exists; `--force` overwrites)
 - `chrome-ranger run` — execute matrix (supports `--chrome`, `--refs`, `--append N`, `--replace`)
 - `chrome-ranger status` — matrix completion table
-- `chrome-ranger list-chrome` — query Chrome for Testing API
-- `chrome-ranger cache clean` — remove cached binaries
+- `chrome-ranger list-chrome` — query Chrome for Testing API (stable channel only)
+- `chrome-ranger cache clean` — remove all cached Chrome binaries
+- `chrome-ranger clean` — remove worktrees
