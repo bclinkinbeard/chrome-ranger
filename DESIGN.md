@@ -165,6 +165,181 @@ export default defineConfig({
 
 When `CHROME_BIN` is set, Playwright uses the provided binary instead of downloading its own. This is the intended integration point — chrome-ranger manages which Chrome binary to use, Playwright just consumes it.
 
+## Example Run
+
+This example benchmarks a React component's render performance across Chrome versions and two branches.
+
+### Project structure
+
+```
+my-app/
+├── src/
+├── tests/
+│   └── bench.spec.ts
+├── playwright.config.ts
+├── package.json
+└── chrome-ranger.yaml
+```
+
+### Config
+
+```yaml
+command: npx playwright test tests/bench.spec.ts
+setup: npm ci
+iterations: 5
+warmup: 1
+workers: 2
+
+chrome:
+  versions:
+    - "120.0.6099.109"
+    - "122.0.6261.94"
+
+code:
+  repo: .
+  refs:
+    - main
+    - feature/virtual-list
+```
+
+### Playwright config
+
+```typescript
+// playwright.config.ts
+export default defineConfig({
+  use: {
+    launchOptions: {
+      executablePath: process.env.CHROME_BIN,
+    },
+  },
+});
+```
+
+### Test script
+
+```typescript
+// tests/bench.spec.ts
+test('render 1000 rows', async ({ page }) => {
+  await page.goto('http://localhost:3000');
+  const start = performance.now();
+  await page.click('#load-data');
+  await page.waitForSelector('tr:nth-child(1000)');
+  const duration = performance.now() - start;
+  console.log(JSON.stringify({ metric: 'render_1000', ms: duration }));
+});
+```
+
+### Successful run
+
+```
+$ chrome-ranger run
+
+Resolving refs...
+  main        → e7f8a9b
+  feature/virtual-list → 3c1d44f
+
+Setting up worktrees...
+  .chrome-ranger/worktrees/main              ✓
+  .chrome-ranger/worktrees/feature-virtual-list ✓
+
+Running setup: npm ci
+  main (e7f8a9b)              ✓  12.4s
+  feature/virtual-list (3c1d44f) ✓  11.8s
+
+Ensuring Chrome binaries...
+  chrome@120.0.6099.109       ✓  cached
+  chrome@122.0.6261.94        ✓  downloading... done (48s)
+
+Running 20 iterations + 4 warmup (2 workers)
+
+  [warmup] chrome@120 × main (e7f8a9b)
+  [warmup] chrome@120 × feature/virtual-list (3c1d44f)
+  [warmup] chrome@122 × main (e7f8a9b)
+  [warmup] chrome@122 × feature/virtual-list (3c1d44f)
+  [ 1/20] chrome@120 × main (e7f8a9b) #0                    4523ms  exit:0
+  [ 2/20] chrome@120 × feature/virtual-list (3c1d44f) #0     2301ms  exit:0
+  [ 3/20] chrome@120 × main (e7f8a9b) #1                    4210ms  exit:0
+  [ 4/20] chrome@120 × feature/virtual-list (3c1d44f) #1     2455ms  exit:0
+  ...
+  [19/20] chrome@122 × feature/virtual-list (3c1d44f) #3     2189ms  exit:0
+  [20/20] chrome@122 × feature/virtual-list (3c1d44f) #4     2210ms  exit:0
+
+Done. 20 runs logged to .chrome-ranger/runs.jsonl
+```
+
+### Partial failures
+
+Failures don't abort the run. Other cells in the matrix keep going.
+
+```
+  [ 1/20] chrome@120 × main (e7f8a9b) #0                    4523ms  exit:0
+  [ 2/20] chrome@120 × feature/virtual-list (3c1d44f) #0     2301ms  exit:0
+  [ 3/20] chrome@120 × main (e7f8a9b) #1                    4210ms  exit:0
+  [ 4/20] chrome@120 × feature/virtual-list (3c1d44f) #1        ✗  exit:1
+  [ 5/20] chrome@122 × main (e7f8a9b) #0                    4102ms  exit:0
+  ...
+
+Done. 20 runs logged to .chrome-ranger/runs.jsonl (2 failed)
+```
+
+Failed runs get the same metadata shape in `runs.jsonl` — just with a non-zero `exitCode`:
+
+```json
+{"id":"f7g8h9","chrome":"120.0.6099.109","ref":"feature/virtual-list","sha":"3c1d44f","iteration":1,"exitCode":1,"durationMs":3891}
+```
+
+stderr is captured in the output file for diagnosis:
+
+```
+$ cat .chrome-ranger/output/f7g8h9.stderr
+Error: Timed out waiting for selector "tr:nth-child(1000)"
+    at bench.spec.ts:5:15
+```
+
+`status` shows the gaps:
+
+```
+                        main (e7f8a9b)   feature/virtual-list (3c1d44f)
+Chrome 120.0.6099.109  5/5 ✓             4/5 ✗ (1 failed)
+Chrome 122.0.6261.94   4/5 ✗ (1 failed)  5/5 ✓
+```
+
+### Resuming after failure
+
+Running again only fills in the gaps — it doesn't re-run successful iterations:
+
+```
+$ chrome-ranger run
+
+Resolving refs...
+  main        → e7f8a9b  (unchanged)
+  feature/virtual-list → 3c1d44f  (unchanged)
+
+Skipping 18 completed iterations.
+Running 2 remaining iterations (2 workers)
+
+  [ 1/2] chrome@120 × feature/virtual-list (3c1d44f) #1     2344ms  exit:0
+  [ 2/2] chrome@122 × main (e7f8a9b) #1                    4198ms  exit:0
+
+Done. 2 runs logged to .chrome-ranger/runs.jsonl
+
+$ chrome-ranger status
+
+                        main (e7f8a9b)   feature/virtual-list (3c1d44f)
+Chrome 120.0.6099.109  5/5 ✓             5/5 ✓
+Chrome 122.0.6261.94   5/5 ✓             5/5 ✓
+```
+
+### Analysis
+
+chrome-ranger stops at data collection. Analysis is yours:
+
+```bash
+cat .chrome-ranger/output/*.stdout | jq -s 'group_by(.metric) | ...'
+```
+
+Or pull `runs.jsonl` into a notebook, join with stdout files, and make charts.
+
 ## What the CLI Does NOT Do
 
 - Parse or interpret script output
