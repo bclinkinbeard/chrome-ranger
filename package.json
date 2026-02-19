@@ -1,0 +1,30 @@
+{
+  "name": "chrome-ranger",
+  "version": "0.1.0",
+  "description": "CLI orchestrator that runs scripts against a matrix of Chrome versions × git refs",
+  "type": "module",
+  "bin": {
+    "chrome-ranger": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": ["chrome", "testing", "benchmarking", "matrix"],
+  "license": "MIT",
+  "dependencies": {
+    "@puppeteer/browsers": "^2.6.1",
+    "commander": "^13.1.0",
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.13.4",
+    "tsup": "^8.4.0",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.6"
+  }
+}
