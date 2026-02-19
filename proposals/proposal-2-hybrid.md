@@ -14,10 +14,10 @@ All color is additive. The display is fully legible without color support.
 
 | Role | ANSI code | Usage |
 |---|---|---|
-| Green | `\x1b[32m` | Passed iterations in log, `\u2713` suffix, filled bar segments |
-| Red | `\x1b[31m` | `FAIL` suffix in log, `\u2717` in bars and dot sequences, failure counts |
+| Green | `\x1b[32m` | Passed iterations in log, `✓` suffix, filled bar segments |
+| Red | `\x1b[31m` | `FAIL` suffix in log, `✗` in bars and dot sequences, failure counts |
 | Yellow | `\x1b[33m` | Active worker labels |
-| Dim | `\x1b[2m` | Not-started cells (`0/N`), empty bar segments (`\u2591`) |
+| Dim | `\x1b[2m` | Not-started cells (`0/N`), empty bar segments (`░`) |
 | Bold | `\x1b[1m` | Progress header line |
 | Reset | `\x1b[0m` | After every colored span |
 
@@ -85,20 +85,20 @@ chrome-ranger run  {done}/{total}  100%  {total_time}                           
 Each row contains one Chrome version label followed by inline progress bars for every ref:
 
 ```
- chrome@120  main \u2588\u2588\u2588\u2591\u2591 3/5   v4.5.0 \u2588\u2591\u2591\u2591\u2591 1/5   v5.0.0-b \u2591\u2591\u2591\u2591\u2591 0/5
+ chrome@120  main ███░░ 3/5   v4.5.0 █░░░░ 1/5   v5.0.0-b ░░░░░ 0/5
 ```
 
-**Bar characters:** U+2588 FULL BLOCK (`\u2588`) for passed iterations, U+2591 LIGHT SHADE (`\u2591`) for remaining iterations, U+2717 BALLOT X (`\u2717`) for failed iterations. The `\u2717` is rendered in red and occupies the exact position of the failed iteration within the bar.
+**Bar characters:** U+2588 FULL BLOCK (`█`) for passed iterations, U+2591 LIGHT SHADE (`░`) for remaining iterations, U+2717 BALLOT X (`✗`) for failed iterations. The `✗` is rendered in red and occupies the exact position of the failed iteration within the bar.
 
 **Bar width:** 1:1 with iterations when the iteration count is 10 or fewer. For higher iteration counts, bars scale down (each character represents 2+ iterations) with the fraction providing the exact count.
 
 **Cell suffixes:**
 - In progress: fraction only (`3/5`)
-- Complete, all passed: `\u2713` (U+2713 CHECK MARK, green). Denominator dropped at scale: `10 \u2713` instead of `10/10 \u2713`
-- Has failures: `\u2717N` (U+2717 BALLOT X + count, red). e.g., `\u27171` means 1 failure
+- Complete, all passed: `✓` (U+2713 CHECK MARK, green). Denominator dropped at scale: `10 ✓` instead of `10/10 ✓`
+- Has failures: `✗N` (U+2717 BALLOT X + count, red). e.g., `✗1` means 1 failure
 - Not started: `0/5` (dim)
 
-**Why `\u2713`/`\u2717` instead of `ok`/`FAIL`:** In this design, every cell already contains a visual progress bar that conveys the shape of the run. The suffix is a quick-scan signal, not the primary information carrier. A single-character `\u2713` is sufficient alongside the bar, and `\u27171` (2 characters) is more compact than `FAIL` (4 characters) while also encoding the failure count. The bar provides the spatial detail that `FAIL` would otherwise need to convey in text.
+**Why `✓`/`✗` instead of `ok`/`FAIL`:** In this design, every cell already contains a visual progress bar that conveys the shape of the run. The suffix is a quick-scan signal, not the primary information carrier. A single-character `✓` is sufficient alongside the bar, and `✗1` (2 characters) is more compact than `FAIL` (4 characters) while also encoding the failure count. The bar provides the spatial detail that `FAIL` would otherwise need to convey in text.
 
 ### Ref name truncation
 
@@ -155,9 +155,9 @@ Matrix: 9 cells, 45 total iterations, 9 warmup iterations.
 ```
 chrome-ranger run  warmup 5/9  elapsed 0:18
 
- chrome@120  main \u2591\u2591\u2591\u2591\u2591 0/5   v4.5.0 \u2591\u2591\u2591\u2591\u2591 0/5   v5.0.0-b \u2591\u2591\u2591\u2591\u2591 0/5
- chrome@121  main \u2591\u2591\u2591\u2591\u2591 0/5   v4.5.0 \u2591\u2591\u2591\u2591\u2591 0/5   v5.0.0-b \u2591\u2591\u2591\u2591\u2591 0/5
- chrome@122  main \u2591\u2591\u2591\u2591\u2591 0/5   v4.5.0 \u2591\u2591\u2591\u2591\u2591 0/5   v5.0.0-b \u2591\u2591\u2591\u2591\u2591 0/5
+ chrome@120  main ░░░░░ 0/5   v4.5.0 ░░░░░ 0/5   v5.0.0-b ░░░░░ 0/5
+ chrome@121  main ░░░░░ 0/5   v4.5.0 ░░░░░ 0/5   v5.0.0-b ░░░░░ 0/5
+ chrome@122  main ░░░░░ 0/5   v4.5.0 ░░░░░ 0/5   v5.0.0-b ░░░░░ 0/5
 
  w1 chrome@120 x main warmup     2.4s    w3 chrome@122 x main warmup     3.6s
  w2 chrome@121 x v4.5.0 warmup   1.1s    w4 chrome@120 x v5.0.0-b warmup 0.8s
@@ -176,9 +176,9 @@ During warmup, the progress line shows `warmup {done}/{total}`. All matrix cells
 ```
 chrome-ranger run  6/45  13%  elapsed 0:41
 
- chrome@120  main \u2588\u2588\u2591\u2591\u2591 2/5   v4.5.0 \u2588\u2588\u2591\u2591\u2591 2/5   v5.0.0-b \u2591\u2591\u2591\u2591\u2591 0/5
- chrome@121  main \u2588\u2588\u2591\u2591\u2591 2/5   v4.5.0 \u2591\u2591\u2591\u2591\u2591 0/5   v5.0.0-b \u2591\u2591\u2591\u2591\u2591 0/5
- chrome@122  main \u2591\u2591\u2591\u2591\u2591 0/5   v4.5.0 \u2591\u2591\u2591\u2591\u2591 0/5   v5.0.0-b \u2591\u2591\u2591\u2591\u2591 0/5
+ chrome@120  main ██░░░ 2/5   v4.5.0 ██░░░ 2/5   v5.0.0-b ░░░░░ 0/5
+ chrome@121  main ██░░░ 2/5   v4.5.0 ░░░░░ 0/5   v5.0.0-b ░░░░░ 0/5
+ chrome@122  main ░░░░░ 0/5   v4.5.0 ░░░░░ 0/5   v5.0.0-b ░░░░░ 0/5
 
  w1 chrome@120 x v4.5.0 #2        3.1s    w3 (idle)
  w2 chrome@121 x main #2          1.8s    w4 (idle)
@@ -193,7 +193,7 @@ chrome-ranger run  6/45  13%  elapsed 0:41
 
 Header: 9 lines. The block bars are 5 characters wide (1:1 with iterations). Not-started cells and their bars are dim. Idle workers are shown dimmed in parentheses -- they appear because not all workers have been dispatched yet. Once all workers are busy, idle entries disappear.
 
-Width: `" chrome@122  main \u2588\u2588\u2588\u2588\u2588 5/5   v4.5.0 \u2588\u2588\u2588\u2588\u2588 5/5   v5.0.0-b \u2588\u2588\u2588\u2588\u2588 5/5"` = ~74 characters. Fits at 80 columns.
+Width: `" chrome@122  main █████ 5/5   v4.5.0 █████ 5/5   v5.0.0-b █████ 5/5"` = ~74 characters. Fits at 80 columns.
 
 The scrolling log below `---` shows each completed iteration with its full cell identifier, duration, and exit code. You can already see that `chrome@120 x main` iterations are taking ~4200-4500ms.
 
@@ -202,9 +202,9 @@ The scrolling log below `---` shows each completed iteration with its full cell 
 ```
 chrome-ranger run  28/45  62%  elapsed 2:14                         1 failed
 
- chrome@120  main \u2588\u2588\u2588\u2588\u2588 5/5 \u2713  v4.5.0 \u2588\u2588\u2588\u2588\u2588 5/5 \u2713  v5.0.0-b \u2588\u2588\u2588\u2717\u2591 3/5 \u27171
- chrome@121  main \u2588\u2588\u2588\u2588\u2588 5/5 \u2713  v4.5.0 \u2588\u2588\u2588\u2591\u2591 3/5    v5.0.0-b \u2588\u2591\u2591\u2591\u2591 1/5
- chrome@122  main \u2588\u2588\u2588\u2588\u2591 4/5    v4.5.0 \u2591\u2591\u2591\u2591\u2591 0/5    v5.0.0-b \u2588\u2591\u2591\u2591\u2591 1/5
+ chrome@120  main █████ 5/5 ✓  v4.5.0 █████ 5/5 ✓  v5.0.0-b ███✗░ 3/5 ✗1
+ chrome@121  main █████ 5/5 ✓  v4.5.0 ███░░ 3/5    v5.0.0-b █░░░░ 1/5
+ chrome@122  main ████░ 4/5    v4.5.0 ░░░░░ 0/5    v5.0.0-b █░░░░ 1/5
 
  w1 chrome@121 x v4.5.0 #3        2.4s    w3 chrome@122 x main #4          0.6s
  w2 chrome@121 x v5.0.0-b #1      4.1s    w4 chrome@122 x v5.0.0-b #1     3.2s
@@ -220,8 +220,8 @@ chrome-ranger run  28/45  62%  elapsed 2:14                         1 failed
 ```
 
 Key details:
-- `\u2588\u2588\u2588\u2717\u2591 3/5 \u27171` -- the `\u2717` (red) occupies the 4th bar position, showing exactly which iteration failed. The suffix `\u27171` gives the count. The fraction `3/5` counts only passes.
-- Complete cells: `\u2588\u2588\u2588\u2588\u2588 5/5 \u2713` (green). You can scan the matrix for non-`\u2713` cells to find what needs attention.
+- `███✗░ 3/5 ✗1` -- the `✗` (red) occupies the 4th bar position, showing exactly which iteration failed. The suffix `✗1` gives the count. The fraction `3/5` counts only passes.
+- Complete cells: `█████ 5/5 ✓` (green). You can scan the matrix for non-`✓` cells to find what needs attention.
 - `1 failed` in the header is right-aligned and red.
 - In the scrolling log, iteration 21 (the failure) is rendered in red with `FAIL`. You can see its duration (2455ms) and exit code immediately. You can also see that subsequent iterations on the same cell (#3, 2189ms) passed -- the failure was transient.
 - All 4 workers are active. Worker w2 at 4.1s is the longest-running.
@@ -233,9 +233,9 @@ On completion, the header transforms: workers are replaced by a summary block. T
 ```
 chrome-ranger run  45/45  100%  3m 22s                              2 failed
 
- chrome@120  main \u2588\u2588\u2588\u2588\u2588 5/5 \u2713  v4.5.0 \u2588\u2588\u2588\u2588\u2588 5/5 \u2713  v5.0.0-b \u2588\u2588\u2588\u2588\u2717 4/5 \u27171
- chrome@121  main \u2588\u2588\u2588\u2588\u2588 5/5 \u2713  v4.5.0 \u2588\u2588\u2588\u2588\u2588 5/5 \u2713  v5.0.0-b \u2588\u2588\u2588\u2588\u2588 5/5 \u2713
- chrome@122  main \u2588\u2588\u2588\u2588\u2588 5/5 \u2713  v4.5.0 \u2588\u2588\u2588\u2588\u2588 5/5 \u2713  v5.0.0-b \u2588\u2588\u2588\u2588\u2717 4/5 \u27171
+ chrome@120  main █████ 5/5 ✓  v4.5.0 █████ 5/5 ✓  v5.0.0-b ████✗ 4/5 ✗1
+ chrome@121  main █████ 5/5 ✓  v4.5.0 █████ 5/5 ✓  v5.0.0-b █████ 5/5 ✓
+ chrome@122  main █████ 5/5 ✓  v4.5.0 █████ 5/5 ✓  v5.0.0-b ████✗ 4/5 ✗1
 
  Done. 45 runs in 3m 22s, 2 failed in 2 cells.
  See: chrome-ranger status --failures
@@ -249,9 +249,9 @@ Header: 8 lines. The summary replaces the worker section, so the header is actua
 ```
 chrome-ranger run  45/45  100%  3m 02s
 
- chrome@120  main \u2588\u2588\u2588\u2588\u2588 5/5 \u2713  v4.5.0 \u2588\u2588\u2588\u2588\u2588 5/5 \u2713  v5.0.0-b \u2588\u2588\u2588\u2588\u2588 5/5 \u2713
- chrome@121  main \u2588\u2588\u2588\u2588\u2588 5/5 \u2713  v4.5.0 \u2588\u2588\u2588\u2588\u2588 5/5 \u2713  v5.0.0-b \u2588\u2588\u2588\u2588\u2588 5/5 \u2713
- chrome@122  main \u2588\u2588\u2588\u2588\u2588 5/5 \u2713  v4.5.0 \u2588\u2588\u2588\u2588\u2588 5/5 \u2713  v5.0.0-b \u2588\u2588\u2588\u2588\u2588 5/5 \u2713
+ chrome@120  main █████ 5/5 ✓  v4.5.0 █████ 5/5 ✓  v5.0.0-b █████ 5/5 ✓
+ chrome@121  main █████ 5/5 ✓  v4.5.0 █████ 5/5 ✓  v5.0.0-b █████ 5/5 ✓
+ chrome@122  main █████ 5/5 ✓  v4.5.0 █████ 5/5 ✓  v5.0.0-b █████ 5/5 ✓
 
  Done. 45 runs in 3m 02s, all passed.
  Logged to .chrome-ranger/runs.jsonl
@@ -272,12 +272,12 @@ Matrix: 24 cells, 240 total iterations, 24 warmup iterations.
 ```
 chrome-ranger run  80/240  33%  elapsed 4:38                       3 failed
 
- chrome@118  main \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588 10 \u2713  v4.5.0 \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588 10 \u2713  v5.0.0-b \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2591\u2591 8/10  feat/vl \u2588\u2588\u2588\u2588\u2588\u2588\u2717\u2591\u2591\u2591 6/10 \u27171
- chrome@119  main \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588 10 \u2713  v4.5.0 \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588 10 \u2713  v5.0.0-b \u2588\u2588\u2588\u2588\u2591\u2591\u2591\u2591\u2591\u2591 4/10  feat/vl \u2588\u2588\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591 2/10
- chrome@120  main \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588 10 \u2713  v4.5.0 \u2588\u2588\u2588\u2588\u2588\u2588\u2591\u2591\u2591\u2591 6/10  v5.0.0-b \u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591 0/10  feat/vl \u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591 0/10
- chrome@121  main \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2591\u2591\u2591 7/10  v4.5.0 \u2588\u2588\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591 2/10  v5.0.0-b \u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591 0/10  feat/vl \u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591 0/10
- chrome@122  main \u2588\u2588\u2588\u2591\u2591\u2591\u2591\u2591\u2591\u2591 3/10  v4.5.0 \u2588\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591 1/10  v5.0.0-b \u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591 0/10  feat/vl \u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591 0/10
- chrome@123  main \u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591 0/10  v4.5.0 \u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591 0/10  v5.0.0-b \u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591 0/10  feat/vl \u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591 0/10
+ chrome@118  main ██████████ 10 ✓  v4.5.0 ██████████ 10 ✓  v5.0.0-b ████████░░ 8/10  feat/vl ██████✗░░░ 6/10 ✗1
+ chrome@119  main ██████████ 10 ✓  v4.5.0 ██████████ 10 ✓  v5.0.0-b ████░░░░░░ 4/10  feat/vl ██░░░░░░░░ 2/10
+ chrome@120  main ██████████ 10 ✓  v4.5.0 ██████░░░░ 6/10  v5.0.0-b ░░░░░░░░░░ 0/10  feat/vl ░░░░░░░░░░ 0/10
+ chrome@121  main ███████░░░ 7/10  v4.5.0 ██░░░░░░░░ 2/10  v5.0.0-b ░░░░░░░░░░ 0/10  feat/vl ░░░░░░░░░░ 0/10
+ chrome@122  main ███░░░░░░░ 3/10  v4.5.0 █░░░░░░░░░ 1/10  v5.0.0-b ░░░░░░░░░░ 0/10  feat/vl ░░░░░░░░░░ 0/10
+ chrome@123  main ░░░░░░░░░░ 0/10  v4.5.0 ░░░░░░░░░░ 0/10  v5.0.0-b ░░░░░░░░░░ 0/10  feat/vl ░░░░░░░░░░ 0/10
 
  w1 chrome@121 x v5.0.0-b #4    1.2s    w4 chrome@122 x v4.5.0 #1    0.4s
  w2 chrome@122 x main #3        3.6s    w5 chrome@120 x feat/vl #7   4.1s
@@ -292,8 +292,8 @@ chrome-ranger run  80/240  33%  elapsed 4:38                       3 failed
 Header: 13 lines. Bars are 10 characters wide (1:1 with iterations). Each matrix line is ~115 characters at full width -- fits 120-column terminals.
 
 Key details:
-- Complete cells: `\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588 10 \u2713` (denominator dropped for compactness)
-- The `\u2717` in `chrome@118 x feat/vl`'s bar shows exactly where the failure occurred (position 7, zero-indexed iteration #6)
+- Complete cells: `██████████ 10 ✓` (denominator dropped for compactness)
+- The `✗` in `chrome@118 x feat/vl`'s bar shows exactly where the failure occurred (position 7, zero-indexed iteration #6)
 - All 6 workers active, packed into 3 lines
 - The scrolling log shows iteration 78 as a `FAIL` in red -- you can see the exit code and duration immediately without waiting for the run to finish
 - Log lines use full ref names (`feature/virtual-list`, `v5.0.0-beta.1`) even though the header abbreviates them
@@ -301,7 +301,7 @@ Key details:
 **100-column fallback:** At terminals narrower than 120 columns, bars shrink to 5 characters (each block = 2 iterations):
 
 ```
- chrome@118  main \u2588\u2588\u2588\u2588\u2588 10 \u2713  v4.5.0 \u2588\u2588\u2588\u2588\u2588 10 \u2713  v5.0.0-b \u2588\u2588\u2588\u2588\u2591 8/10  feat/vl \u2588\u2588\u2588\u2717\u2591 6/10 \u27171
+ chrome@118  main █████ 10 ✓  v4.5.0 █████ 10 ✓  v5.0.0-b ████░ 8/10  feat/vl ███✗░ 6/10 ✗1
 ```
 
 The bar is approximate (each character represents 2 iterations), but the fraction is exact. Bar width is decided once at startup based on `process.stderr.columns`.
@@ -317,9 +317,9 @@ The `status` command shows a static matrix grid read from `runs.jsonl`. It uses 
 ```
 $ chrome-ranger status
 
- chrome@120  main \u2591\u2591\u2591\u2591\u2591 0/5   v4.5.0 \u2591\u2591\u2591\u2591\u2591 0/5   v5.0.0-b \u2591\u2591\u2591\u2591\u2591 0/5
- chrome@121  main \u2591\u2591\u2591\u2591\u2591 0/5   v4.5.0 \u2591\u2591\u2591\u2591\u2591 0/5   v5.0.0-b \u2591\u2591\u2591\u2591\u2591 0/5
- chrome@122  main \u2591\u2591\u2591\u2591\u2591 0/5   v4.5.0 \u2591\u2591\u2591\u2591\u2591 0/5   v5.0.0-b \u2591\u2591\u2591\u2591\u2591 0/5
+ chrome@120  main ░░░░░ 0/5   v4.5.0 ░░░░░ 0/5   v5.0.0-b ░░░░░ 0/5
+ chrome@121  main ░░░░░ 0/5   v4.5.0 ░░░░░ 0/5   v5.0.0-b ░░░░░ 0/5
+ chrome@122  main ░░░░░ 0/5   v4.5.0 ░░░░░ 0/5   v5.0.0-b ░░░░░ 0/5
 
 No runs recorded.
 ```
@@ -329,9 +329,9 @@ No runs recorded.
 ```
 $ chrome-ranger status
 
- chrome@120  main \u2588\u2588\u2588\u2588\u2588 5/5 \u2713  v4.5.0 \u2588\u2588\u2588\u2588\u2588 5/5 \u2713  v5.0.0-b \u2588\u2588\u2591\u2591\u2591 2/5
- chrome@121  main \u2588\u2588\u2588\u2588\u2588 5/5 \u2713  v4.5.0 \u2588\u2588\u2588\u2591\u2591 3/5    v5.0.0-b \u2591\u2591\u2591\u2591\u2591 0/5
- chrome@122  main \u2588\u2588\u2588\u2588\u2591 4/5    v4.5.0 \u2591\u2591\u2591\u2591\u2591 0/5    v5.0.0-b \u2591\u2591\u2591\u2591\u2591 0/5
+ chrome@120  main █████ 5/5 ✓  v4.5.0 █████ 5/5 ✓  v5.0.0-b ██░░░ 2/5
+ chrome@121  main █████ 5/5 ✓  v4.5.0 ███░░ 3/5    v5.0.0-b ░░░░░ 0/5
+ chrome@122  main ████░ 4/5    v4.5.0 ░░░░░ 0/5    v5.0.0-b ░░░░░ 0/5
 
 29/45 complete (0 failed)
 ```
@@ -341,9 +341,9 @@ $ chrome-ranger status
 ```
 $ chrome-ranger status
 
- chrome@120  main \u2588\u2588\u2588\u2588\u2588 5/5 \u2713  v4.5.0 \u2588\u2588\u2588\u2588\u2588 5/5 \u2713  v5.0.0-b \u2588\u2588\u2588\u2588\u2717 4/5 \u27171
- chrome@121  main \u2588\u2588\u2588\u2588\u2588 5/5 \u2713  v4.5.0 \u2588\u2588\u2588\u2588\u2588 5/5 \u2713  v5.0.0-b \u2588\u2588\u2588\u2588\u2588 5/5 \u2713
- chrome@122  main \u2588\u2588\u2588\u2588\u2588 5/5 \u2713  v4.5.0 \u2588\u2588\u2588\u2588\u2588 5/5 \u2713  v5.0.0-b \u2588\u2588\u2588\u2588\u2717 4/5 \u27171
+ chrome@120  main █████ 5/5 ✓  v4.5.0 █████ 5/5 ✓  v5.0.0-b ████✗ 4/5 ✗1
+ chrome@121  main █████ 5/5 ✓  v4.5.0 █████ 5/5 ✓  v5.0.0-b █████ 5/5 ✓
+ chrome@122  main █████ 5/5 ✓  v4.5.0 █████ 5/5 ✓  v5.0.0-b ████✗ 4/5 ✗1
 
 45/45 complete (2 failed in 2 cells)
 Failures in: chrome@120 x v5.0.0-beta.1, chrome@122 x v5.0.0-beta.1
@@ -356,9 +356,9 @@ The bars show failure positions. You can see both failures occurred at iteration
 ```
 $ chrome-ranger status
 
- chrome@120  main \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588 8/8 \u2713  v4.5.0 \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588 8/8 \u2713  v5.0.0-b \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2717 7/8 \u27171
- chrome@121  main \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588 8/8 \u2713  v4.5.0 \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588 8/8 \u2713  v5.0.0-b \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588 8/8 \u2713
- chrome@122  main \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588 8/8 \u2713  v4.5.0 \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588 8/8 \u2713  v5.0.0-b \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2717 7/8 \u27171
+ chrome@120  main ████████ 8/8 ✓  v4.5.0 ████████ 8/8 ✓  v5.0.0-b ███████✗ 7/8 ✗1
+ chrome@121  main ████████ 8/8 ✓  v4.5.0 ████████ 8/8 ✓  v5.0.0-b ████████ 8/8 ✓
+ chrome@122  main ████████ 8/8 ✓  v4.5.0 ████████ 8/8 ✓  v5.0.0-b ███████✗ 7/8 ✗1
 
 72/72 complete (2 failed in 2 cells)
 ```
@@ -371,7 +371,7 @@ The bars have grown from 5 to 8 characters, reflecting the new target (original 
 
 Static, pipe-friendly output for investigating failures after a run. Groups by cell. Shows per-iteration dot sequences, stderr excerpts, and an actionable retry command.
 
-The dot sequence uses U+25CF BLACK CIRCLE (`\u25cf`, green) for passes and U+2717 BALLOT X (`\u2717`, red) for failures, in iteration order. This gives instant visual recognition of where failures cluster (early? late? random?).
+The dot sequence uses U+25CF BLACK CIRCLE (`●`, green) for passes and U+2717 BALLOT X (`✗`, red) for failures, in iteration order. This gives instant visual recognition of where failures cluster (early? late? random?).
 
 ### No failures
 
@@ -389,7 +389,7 @@ $ chrome-ranger status --failures
 2 failures in 2 cells
 
 Chrome 120.0.6099.109 x v5.0.0-beta.1 (f9a0b1c)           1 of 5 failed
-  \u25cf\u25cf\u25cf\u2717\u25cf  4/5 passed, 1 failed
+  ●●●✗●  4/5 passed, 1 failed
   #3  exit:1  2455ms  run:f7g8h9i0
   stderr (last 3 lines):
     Error: Timed out waiting for selector "tr:nth-child(1000)"
@@ -397,7 +397,7 @@ Chrome 120.0.6099.109 x v5.0.0-beta.1 (f9a0b1c)           1 of 5 failed
   output: .chrome-ranger/output/f7g8h9i0.stderr
 
 Chrome 122.0.6261.94 x v5.0.0-beta.1 (f9a0b1c)            1 of 5 failed
-  \u25cf\u25cf\u2717\u25cf\u25cf  4/5 passed, 1 failed
+  ●●✗●●  4/5 passed, 1 failed
   #2  exit:1  2891ms  run:e6f7g8h9
   stderr (last 3 lines):
     Error: Timed out waiting for selector "tr:nth-child(1000)"
@@ -417,7 +417,7 @@ $ chrome-ranger status --failures
 5 failures in 3 cells
 
 Chrome 118.0.5993.70 x feature/virtual-list (a1b2c3d)      2 of 10 failed
-  \u25cf\u25cf\u25cf\u25cf\u25cf\u25cf\u2717\u25cf\u25cf\u2717  8/10 passed, 2 failed
+  ●●●●●●✗●●✗  8/10 passed, 2 failed
   #6  exit:1  2891ms  run:a1b2c3d4
   #9  exit:1  3102ms  run:d4e5f6a7
   stderr (both identical):
@@ -425,7 +425,7 @@ Chrome 118.0.5993.70 x feature/virtual-list (a1b2c3d)      2 of 10 failed
         at bench.spec.ts:5:15
 
 Chrome 120.0.6099.109 x feature/virtual-list (a1b2c3d)     2 of 10 failed
-  \u25cf\u25cf\u25cf\u25cf\u25cf\u25cf\u25cf\u2717\u25cf\u2717  8/10 passed, 2 failed
+  ●●●●●●●✗●✗  8/10 passed, 2 failed
   #7  exit:1  2710ms  run:g7h8i9j0
   #9  exit:1  2891ms  run:k1l2m3n4
   stderr (both identical):
@@ -433,7 +433,7 @@ Chrome 120.0.6099.109 x feature/virtual-list (a1b2c3d)     2 of 10 failed
         at bench.spec.ts:5:15
 
 Chrome 123.0.6312.58 x v5.0.0-beta.1 (f9a0b1c)            1 of 10 failed
-  \u25cf\u25cf\u25cf\u25cf\u2717\u25cf\u25cf\u25cf\u25cf\u25cf  9/10 passed, 1 failed
+  ●●●●✗●●●●●  9/10 passed, 1 failed
   #4  exit:2  1823ms  run:o5p6q7r8
   stderr:
     ENOENT: no such file or directory, open '/tmp/bench-result.json'
@@ -706,7 +706,7 @@ Checked once at startup and on `SIGWINCH`.
 | >= 120 | Full bar width (1:1 with iterations, up to 10 chars), full ref names |
 | 100-119 | Bars at 5 chars (1:2 mapping for 10 iterations), abbreviated ref names |
 | 80-99 | Bars at 5 chars, aggressive ref abbreviation, workers on 1 line |
-| 60-79 | No bars. Matrix shows fractions only: `chrome@120  main 5/5 \u2713  v4.5.0 3/5` |
+| 60-79 | No bars. Matrix shows fractions only: `chrome@120  main 5/5 ✓  v4.5.0 3/5` |
 | < 60 | Fall back to non-TTY sequential log |
 
 Bar width decision is made once at startup. The formula:

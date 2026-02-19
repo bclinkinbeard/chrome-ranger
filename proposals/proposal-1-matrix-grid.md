@@ -15,7 +15,7 @@ All color is additive. The display is fully legible without color support.
 | Role | ANSI code | Usage |
 |---|---|---|
 | Green | `\x1b[32m` | Completed counts, `ok` suffix, filled progress segments |
-| Red | `\x1b[31m` | `FAIL` suffix, failure counts, `\u2717` in dot sequences |
+| Red | `\x1b[31m` | `FAIL` suffix, failure counts, `✗` in dot sequences |
 | Yellow | `\x1b[33m` | Braille spinner on active cells |
 | Dim | `\x1b[2m` | Not-started cells (`0/N`), separator line |
 | Bold | `\x1b[1m` | Progress header line |
@@ -55,7 +55,7 @@ With failures:
 chrome-ranger run  {done}/{total}  {pct}%  {bar}  {elapsed}  {N} failed
 ```
 
-The bar is 30 characters wide (fixed). Filled segments use U+25B0 (`\u25b0`, `▰`), empty segments use U+25B1 (`\u25b1`, `▱`). The `{N} failed` text is red and appears only when failures exist. On completion, `{elapsed}` changes to `done in {duration}`.
+The bar is 30 characters wide (fixed). Filled segments use U+25B0 (`▰`, `▰`), empty segments use U+25B1 (`▱`, `▱`). The `{N} failed` text is red and appears only when failures exist. On completion, `{elapsed}` changes to `done in {duration}`.
 
 ### Cell format
 
@@ -65,11 +65,11 @@ Each matrix cell shows a fraction and a status suffix:
 3/5         In progress, no failures yet
 5/5 ok      Complete, all passed
 4/5 FAIL    Has at least one failure (complete or in progress)
-3/5 \u28be       Worker currently active in this cell (spinner)
+3/5 ⢾       Worker currently active in this cell (spinner)
 0/5         Not started (rendered dim)
 ```
 
-The braille spinner cycles through eight frames: `\u28be \u28bd \u28bb \u2a3f \u283f \u29df \u29ef \u28f7` (U+28BE, U+28BD, U+28BB, U+28BF, U+287F, U+29DF, U+29EF, U+28F7). It is rendered in yellow. If two workers target the same cell simultaneously (different iterations), only one spinner is shown; the ticker line disambiguates.
+The braille spinner cycles through eight frames: `⢾ ⢽ ⢻ ⨿ ⠿ ⧟ ⧯ ⣷` (U+28BE, U+28BD, U+28BB, U+28BF, U+287F, U+29DF, U+29EF, U+28F7). It is rendered in yellow. If two workers target the same cell simultaneously (different iterations), only one spinner is shown; the ticker line disambiguates.
 
 **Why `ok`/`FAIL` instead of checkmarks and crosses:** The ASCII words `ok` and `FAIL` are unambiguous on every terminal and monospaced font. `FAIL` at 4 characters is wider than a single glyph but earns its width by being unmissable during a matrix scan. There is zero dependence on whether the font has Unicode symbol glyphs at the correct width.
 
@@ -104,16 +104,16 @@ chrome@122      ...
 
 ### Worker ticker
 
-A single line at the bottom, prefixed with U+25B8 (`\u25b8`, `▸`). Format: `wN {chrome_major}\u00d7{ref} #{iter} ({elapsed}s)`. Idle workers are omitted.
+A single line at the bottom, prefixed with U+25B8 (`▸`, `▸`). Format: `wN {chrome_major}×{ref} #{iter} ({elapsed}s)`. Idle workers are omitted.
 
 ```
-  \u25b8 w1 120\u00d7v4.5.0 #2 (3.1s)  w2 121\u00d7main #2 (1.8s)
+  ▸ w1 120×v4.5.0 #2 (3.1s)  w2 121×main #2 (1.8s)
 ```
 
 When workers overflow the terminal width, truncate with `+N`:
 
 ```
-  \u25b8 w1 118\u00d7v5.0b1 #8 (2.1s)  w2 120\u00d7fvl #4 (3.8s)  w3 121\u00d7main #3 (1.2s)  +3
+  ▸ w1 118×v5.0b1 #8 (2.1s)  w2 120×fvl #4 (3.8s)  w3 121×main #3 (1.2s)  +3
 ```
 
 Elapsed time per worker ticks up live. This is essential for identifying stuck workers.
@@ -128,14 +128,14 @@ Matrix: 9 cells, 45 total iterations, 9 warmup iterations.
 ### Warmup phase
 
 ```
-chrome-ranger run  warmup 5/9  \u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1  0:18
+chrome-ranger run  warmup 5/9  ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱  0:18
 
                  main          v4.5.0         feat/virtual-list
 chrome@120      0/5            0/5            0/5
 chrome@121      0/5            0/5            0/5
 chrome@122      0/5            0/5            0/5
 
-  \u25b8 w1 120\u00d7main warmup (2.4s)  w2 121\u00d7v4.5.0 warmup (1.1s)  w3 122\u00d7main warmup (3.6s)  w4 120\u00d7fvl warmup (0.8s)
+  ▸ w1 120×main warmup (2.4s)  w2 121×v4.5.0 warmup (1.1s)  w3 122×main warmup (3.6s)  w4 120×fvl warmup (0.8s)
 ```
 
 During warmup, the progress header shows `warmup {done}/{total}` instead of a fraction of real iterations. All matrix cells remain at `0/N` because warmup results are discarded. The ticker shows `warmup` instead of an iteration number. The progress bar tracks warmup completion (fills to 100% when all warmups are done, then resets for real iterations).
@@ -143,14 +143,14 @@ During warmup, the progress header shows `warmup {done}/{total}` instead of a fr
 ### Early run (6/45 done)
 
 ```
-chrome-ranger run  6/45  13%  \u25b0\u25b0\u25b0\u25b0\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1  0:38
+chrome-ranger run  6/45  13%  ▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱  0:38
 
                  main          v4.5.0         feat/virtual-list
-chrome@120      2/5            2/5 \u28be          0/5
-chrome@121      2/5 \u28be         0/5             0/5
+chrome@120      2/5            2/5 ⢾          0/5
+chrome@121      2/5 ⢾         0/5             0/5
 chrome@122      0/5            0/5             0/5
 
-  \u25b8 w1 120\u00d7v4.5.0 #2 (3.1s)  w2 121\u00d7main #2 (1.8s)
+  ▸ w1 120×v4.5.0 #2 (3.1s)  w2 121×main #2 (1.8s)
 ```
 
 Height: 8 lines. Width: ~78 columns. Two workers active (w3/w4 idle, omitted). Spinners on `chrome@120 x v4.5.0` and `chrome@121 x main` match the two active workers in the ticker. Not-started cells (`0/5`) are rendered dim.
@@ -158,14 +158,14 @@ Height: 8 lines. Width: ~78 columns. Two workers active (w3/w4 idle, omitted). S
 ### Mid-run with 1 failure (28/45 done)
 
 ```
-chrome-ranger run  28/45  62%  \u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1  2:04  1 failed
+chrome-ranger run  28/45  62%  ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱  2:04  1 failed
 
                  main          v4.5.0         feat/virtual-list
 chrome@120      5/5 ok         5/5 ok         4/5 FAIL
-chrome@121      5/5 ok         3/5 \u28be          1/5 \u28be
-chrome@122      4/5 \u28be         0/5             1/5 \u28be
+chrome@121      5/5 ok         3/5 ⢾          1/5 ⢾
+chrome@122      4/5 ⢾         0/5             1/5 ⢾
 
-  \u25b8 w1 121\u00d7v4.5.0 #3 (2.4s)  w2 121\u00d7fvl #1 (4.1s)  w3 122\u00d7main #4 (0.6s)  w4 122\u00d7fvl #1 (3.2s)
+  ▸ w1 121×v4.5.0 #3 (2.4s)  w2 121×fvl #1 (4.1s)  w3 122×main #4 (0.6s)  w4 122×fvl #1 (3.2s)
 ```
 
 Height: 8 lines. Width: ~92 columns. The cell `chrome@120 x feat/virtual-list` shows `4/5 FAIL` in red -- 4 iterations completed successfully, 1 failed. The header shows `1 failed` as a running counter. All four workers are active. Worker w2 at 4.1s is visibly the longest-running, making it easy to spot potential hangs.
@@ -173,7 +173,7 @@ Height: 8 lines. Width: ~92 columns. The cell `chrome@120 x feat/virtual-list` s
 ### Complete with 2 failures (45/45)
 
 ```
-chrome-ranger run  45/45  100%  \u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0  done in 3m 22s
+chrome-ranger run  45/45  100%  ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰  done in 3m 22s
 
                  main          v4.5.0         feat/virtual-list
 chrome@120      5/5 ok         5/5 ok         4/5 FAIL
@@ -190,7 +190,7 @@ Height: 10 lines. The ticker is gone. In its place: a log-file confirmation line
 ### Complete, all pass (45/45)
 
 ```
-chrome-ranger run  45/45  100%  \u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0  done in 3m 04s
+chrome-ranger run  45/45  100%  ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰  done in 3m 04s
 
                  main          v4.5.0         feat/virtual-list
 chrome@120      5/5 ok         5/5 ok         5/5 ok
@@ -212,17 +212,17 @@ Matrix: 24 cells, 240 total iterations, 24 warmup iterations.
 ### Mid-run (80/240 done, 3 failures)
 
 ```
-chrome-ranger run  80/240  33%  \u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b0\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1\u25b1  4:38  3 failed
+chrome-ranger run  80/240  33%  ▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱  4:38  3 failed
 
                  main          v4.5.0         v5.0-beta.1    fvl
-chrome@118      10 ok          10 ok          8/10 \u28be        0/10
+chrome@118      10 ok          10 ok          8/10 ⢾        0/10
 chrome@119      10 ok          10 ok          4/10           0/10
-chrome@120      10 ok          6/10 \u28be        0/10           0/10
-chrome@121      7/10 \u28be        2/10 \u28be         0/10           0/10
-chrome@122      3/10 \u28be        0/10           0/10           0/10
+chrome@120      10 ok          6/10 ⢾        0/10           0/10
+chrome@121      7/10 ⢾        2/10 ⢾         0/10           0/10
+chrome@122      3/10 ⢾        0/10           0/10           0/10
 chrome@123      0/10           0/10           0/10           0/10
 
-  \u25b8 w1 118\u00d7v5.0b1 #8 (2.1s)  w2 120\u00d7v4.5.0 #6 (3.8s)  w3 121\u00d7main #7 (1.2s)  +3
+  ▸ w1 118×v5.0b1 #8 (2.1s)  w2 120×v4.5.0 #6 (3.8s)  w3 121×main #7 (1.2s)  +3
 ```
 
 Height: 12 lines. Width: ~88 columns.
@@ -238,7 +238,7 @@ At 120+ columns, there is room to show the denominator on complete cells and use
 
 ```
                  main          v4.5.0         v5.0-beta.1     virtual-list
-chrome@118      10/10 ok       10/10 ok       8/10 \u28be         0/10
+chrome@118      10/10 ok       10/10 ok       8/10 ⢾         0/10
 ```
 
 ---
@@ -308,7 +308,7 @@ The target per cell has increased from 5 to 8. The denominator reflects the new 
 
 Static, pipe-friendly output for investigating failures after a run. Groups by cell. Shows per-iteration dot sequences, stderr excerpts, and an actionable retry command.
 
-The dot sequence (`\u25cf\u25cf\u25cf\u2717\u25cf`) uses U+25CF BLACK CIRCLE for passes and U+2717 BALLOT X for failures. Passes are green, failures are red. This notation appears only in the `--failures` view (not the live display) because per-iteration granularity matters when investigating, not when monitoring.
+The dot sequence (`●●●✗●`) uses U+25CF BLACK CIRCLE for passes and U+2717 BALLOT X for failures. Passes are green, failures are red. This notation appears only in the `--failures` view (not the live display) because per-iteration granularity matters when investigating, not when monitoring.
 
 ### No failures
 
@@ -326,7 +326,7 @@ $ chrome-ranger status --failures
 2 failures in 2 cells
 
 Chrome 120.0.6099.109 x feature/virtual-list (a1b2c3d)    1 of 5 failed
-  \u25cf\u25cf\u25cf\u2717\u25cf  4/5 passed, 1 failed
+  ●●●✗●  4/5 passed, 1 failed
   run f7g8h9i0  iteration #3  exit:1  2891ms
   stderr:
     Error: Timed out waiting for selector "tr:nth-child(1000)"
@@ -335,7 +335,7 @@ Chrome 120.0.6099.109 x feature/virtual-list (a1b2c3d)    1 of 5 failed
   output: .chrome-ranger/output/f7g8h9i0.stderr
 
 Chrome 122.0.6261.94 x feature/virtual-list (a1b2c3d)     1 of 5 failed
-  \u25cf\u25cf\u2717\u25cf\u25cf  4/5 passed, 1 failed
+  ●●✗●●  4/5 passed, 1 failed
   run e6f7g8h9  iteration #2  exit:1  2891ms
   stderr:
     Error: Timed out waiting for selector "tr:nth-child(1000)"
@@ -364,7 +364,7 @@ $ chrome-ranger status --failures
 5 failures in 3 cells
 
 Chrome 118.0.5993.70 x feature/virtual-list (a1b2c3d)      2 of 10 failed
-  \u25cf\u25cf\u25cf\u25cf\u25cf\u25cf\u2717\u25cf\u25cf\u2717  8/10 passed, 2 failed
+  ●●●●●●✗●●✗  8/10 passed, 2 failed
   run a1b2c3d4  iteration #6   exit:1  2891ms
   run d4e5f6a7  iteration #9   exit:1  3102ms
   stderr (both identical):
@@ -372,7 +372,7 @@ Chrome 118.0.5993.70 x feature/virtual-list (a1b2c3d)      2 of 10 failed
         at bench.spec.ts:5:15
 
 Chrome 120.0.6099.109 x feature/virtual-list (a1b2c3d)     2 of 10 failed
-  \u25cf\u25cf\u25cf\u25cf\u25cf\u25cf\u25cf\u2717\u25cf\u2717  8/10 passed, 2 failed
+  ●●●●●●●✗●✗  8/10 passed, 2 failed
   run g7h8i9j0  iteration #7   exit:1  2710ms
   run k1l2m3n4  iteration #9   exit:1  2891ms
   stderr (both identical):
@@ -380,7 +380,7 @@ Chrome 120.0.6099.109 x feature/virtual-list (a1b2c3d)     2 of 10 failed
         at bench.spec.ts:5:15
 
 Chrome 123.0.6312.58 x v5.0.0-beta.1 (f9a0b1c)            1 of 10 failed
-  \u25cf\u25cf\u25cf\u25cf\u2717\u25cf\u25cf\u25cf\u25cf\u25cf  9/10 passed, 1 failed
+  ●●●●✗●●●●●  9/10 passed, 1 failed
   run o5p6q7r8  iteration #4   exit:2  1823ms
   stderr:
     ENOENT: no such file or directory, open '/tmp/bench-result.json'
