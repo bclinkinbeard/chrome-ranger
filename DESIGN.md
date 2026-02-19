@@ -164,9 +164,34 @@ Chrome 121    8/5 ✓             3/5 ...
 Chrome 122    0/5               0/5
 ```
 
-## Error Output
+## CLI Output Format
 
-All CLI output goes to stderr — errors, progress, and status messages. This keeps stdout completely clean for composability with pipes. Errors use a prefix: `error: <message>`. No stack traces unless `DEBUG=chrome-ranger` is set.
+All CLI output goes to stderr — errors, progress, and status messages. This keeps stdout completely clean for composability with pipes.
+
+### Progress lines
+
+- **Warmup:** `[warmup] chrome@120 × main (e7f8a9b)` — label only, no duration or exit code (warmups are discarded)
+- **Iteration:** `[ 3/45] chrome@120 × main (e7f8a9b) #2    4523ms  exit:0` — always shows duration and exit code, whether the iteration succeeded or failed
+- **Chrome version** uses the major version in progress lines (e.g., `chrome@120`); `runs.jsonl` always stores the full version string
+
+### Phase output
+
+The `run` command outputs in phases: resolving refs, setting up worktrees, running setup, ensuring Chrome binaries, warmup, iterations, and a summary line. See the example run below for the full format.
+
+### Setup failures
+
+If setup fails for a ref, it's shown inline in the setup phase with `✗` and the ref is noted as skipped:
+
+```
+Running setup: npm ci
+  main (e7f8a9b)                 ✓  12.4s
+  feature/virtual-list (3c1d44f) ✗  exit:1
+  Skipping all iterations for feature/virtual-list
+```
+
+### Errors
+
+Errors use a prefix: `error: <message>`. No stack traces unless `DEBUG=chrome-ranger` is set.
 
 ## Tech Stack
 
@@ -303,7 +328,7 @@ Failures don't abort the run. Other cells in the matrix keep going.
   [ 1/20] chrome@120 × main (e7f8a9b) #0                    4523ms  exit:0
   [ 2/20] chrome@120 × feature/virtual-list (3c1d44f) #0     2301ms  exit:0
   [ 3/20] chrome@120 × main (e7f8a9b) #1                    4210ms  exit:0
-  [ 4/20] chrome@120 × feature/virtual-list (3c1d44f) #1        ✗  exit:1
+  [ 4/20] chrome@120 × feature/virtual-list (3c1d44f) #1     3891ms  exit:1
   [ 5/20] chrome@122 × main (e7f8a9b) #0                    4102ms  exit:0
   ...
 
