@@ -5,9 +5,11 @@ A CLI orchestrator that runs arbitrary scripts against a matrix of Chrome versio
 ## Config: `chrome-ranger.yaml`
 
 ```yaml
-script: ./bench.sh
+command: npx playwright test
+setup: npm ci                   # runs once per worktree, before first iteration
 iterations: 5
 warmup: 1
+workers: 4                      # parallel executions (default: 1)
 
 chrome:
   versions:
@@ -42,19 +44,20 @@ The script's stdout and stderr are captured verbatim. The CLI does not parse or 
 
 ```
 .chrome-ranger/
-  runs.ndjson              # one JSON metadata line per run, append-only
+  lock                     # lockfile, prevents concurrent runs
+  runs.jsonl              # one JSON metadata line per run, append-only
   output/
     {id}.stdout            # raw stdout per run
     {id}.stderr            # raw stderr per run
   worktrees/
-    {ref}/                 # git worktrees, managed by CLI
+    {ref}/                 # git worktrees, managed by CLI (slashes replaced with hyphens; disambiguated on collision)
 
 ~/.cache/chrome-ranger/    # system-level, shared across projects
   chrome-120.0.6099.109/   # respects XDG_CACHE_HOME
   chrome-121.0.6167.85/
 ```
 
-## Run Metadata (`runs.ndjson`)
+## Run Metadata (`runs.jsonl`)
 
 One JSON line per iteration, append-only:
 
@@ -67,12 +70,14 @@ One JSON line per iteration, append-only:
 
 ```typescript
 interface Config {
-  script: string;
-  iterations: number;       // minimum runs per matrix cell
+  command: string;            // shell command to run each iteration
+  setup?: string;             // shell command run once per worktree before first iteration
+  iterations: number;         // minimum runs per matrix cell
   warmup: number;
+  workers: number;            // parallel executions (default: 1)
   chrome: {
     versions: string[];
-    cache_dir?: string;     // default: ~/.cache/chrome-ranger
+    cache_dir?: string;       // default: ~/.cache/chrome-ranger
   };
   code: {
     repo: string;
@@ -86,7 +91,7 @@ interface RunMeta {
   ref: string;               // git ref as specified in config
   sha: string;               // resolved commit SHA
   iteration: number;
-  timestamp: string;         // ISO 8601
+  timestamp: string;         // ISO 8601 UTC (e.g., "2026-02-18T10:30:00.000Z")
   durationMs: number;        // wall clock
   exitCode: number;
 }
@@ -98,31 +103,59 @@ interface RunMeta {
 ## CLI Commands
 
 ```
-chrome-ranger init                                        # scaffold config
-chrome-ranger run [--chrome <v>] [--refs <ref>]           # fill cells to minimum
+chrome-ranger init [--force]                               # scaffold config (refuses if exists; --force overwrites)
+chrome-ranger run [--chrome <v>]... [--refs <ref>]...      # fill cells to minimum (flags repeat for multiple values)
                   [--append N]                             # add N more runs to targeted cells
                   [--replace]                              # clear targeted cells, then run
 chrome-ranger status                                      # matrix completion table
-chrome-ranger list-chrome [--latest N] [--since DATE]     # query Chrome for Testing API
-chrome-ranger cache clean                                 # remove cached Chrome binaries
+chrome-ranger list-chrome [--latest N] [--since DATE]     # query Chrome for Testing API (stable channel only)
+chrome-ranger cache clean                                 # remove all cached Chrome binaries
+chrome-ranger clean                                       # remove worktrees (.chrome-ranger/worktrees/)
 ```
 
 ## Run Behavior
 
-1. Parse config, load `runs.ndjson`
-2. Compute full matrix: `chrome.versions × code.refs × [0..iterations)`
-3. Subtract completed runs → pending list
-4. For each code ref: resolve SHA, create/reuse git worktree
-5. For each Chrome version: ensure binary is downloaded and cached
-6. For each pending run:
-   - Spawn script with env vars
-   - Capture stdout/stderr to `.chrome-ranger/output/{id}.*`
-   - Append metadata line to `runs.ndjson`
-   - Print progress: `[3/45] chrome@121 × main (e7f8a9b) #2`
-7. `--append N` skips the diff, just adds N runs to the specified cells
-8. `--replace` deletes existing runs for the targeted cells before running
+1. Acquire lockfile (`.chrome-ranger/lock`). The lockfile contains the PID of the owning process. If already locked, check whether the PID is still alive — if the process is dead (crash), reclaim the lock; if alive, fail immediately with an error.
+2. Parse config, load `runs.jsonl`
+3. Compute full matrix: `chrome.versions × code.refs × [0..iterations)`
+4. Subtract completed runs → pending list. A cell is identified by `(chrome version, resolved SHA)` — if a branch advances to a new commit, old runs don't count. A cell is "complete" only when it has a run with `exitCode: 0`. Failed runs (non-zero exit) stay in `runs.jsonl` as history but don't count toward completion.
+5. For each code ref: resolve SHA, create/reuse git worktree. All refs get worktrees — even if a ref points to the current HEAD, a worktree is still created to avoid modifying the user's working directory.
+6. For each Chrome version: ensure binary is downloaded and cached (via `@puppeteer/browsers`). Version strings must be exact (e.g., `"120.0.6099.109"`); no prefix matching. Use `list-chrome` to discover available versions.
+7. For each worktree that will be used: run `setup` command if configured (once per worktree, skip if already set up for this SHA). Setup tracking: after a successful setup, write a marker file `.chrome-ranger-setup-done` containing the SHA into the worktree. On subsequent runs, compare the marker SHA to the current resolved SHA — only re-run setup if they differ. `setup` runs with `cwd` set to the worktree directory. If setup fails for a ref, log the error and skip all iterations for that ref — other refs continue.
+8. Run all warmup iterations first, before any real iterations. Warmups are parallelized across workers just like real iterations. Warmup count is per (chrome, ref) cell — `warmup: 1` with a 2×2 matrix = 4 warmup iterations total. Warmup output is completely discarded (not written to `runs.jsonl` or the output directory). If a warmup iteration fails (non-zero exit), skip all remaining iterations for that cell and log a warning.
+9. Dispatch pending runs across `workers` parallel workers:
+   - Each worker picks the next pending run from the queue
+   - Spawns `command` via shell with `cwd` set to `CODE_DIR` (the worktree) and env vars set
+   - Captures stdout/stderr to `.chrome-ranger/output/{id}.*`
+   - Appends metadata line to `runs.jsonl` (serialized — one writer)
+   - Run IDs are generated via `crypto.randomUUID()`
+   - Prints progress: `[3/45] chrome@121 × main (e7f8a9b) #2` (where `#2` is the `ITERATION` value)
+10. `--append N` skips the diff, just adds N runs to the specified cells. Iteration numbering continues from the last iteration index (e.g., if a cell has iterations 0-4, appended runs start at iteration 5).
+11. `--replace` deletes existing runs for the targeted cells before running. Implementation: read all lines from `runs.jsonl`, filter out targeted entries, write back. Delete corresponding output files (`{id}.stdout`, `{id}.stderr`). Iteration numbering resets to 0 for replaced cells.
+12. `--chrome` and `--refs` filters scope everything: `--replace` only clears targeted cells, `--append` only adds to targeted cells
+13. Release lockfile on exit.
+
+### Parallelism
+
+Workers run iterations concurrently up to the configured `workers` count. Each worker receives the full environment contract. The `runs.jsonl` append is serialized to avoid interleaving. Setup commands are run before dispatching any iterations and are not parallelized — each worktree is set up exactly once.
+
+**Shared worktrees:** Multiple workers may run concurrently in the same worktree directory (e.g., two iterations of the same ref with different Chrome versions). The user's script must handle this — for example, use `ITERATION` or a unique ID in any temp file names. This is documented in the environment contract.
+
+### Signal Handling
+
+On SIGINT/SIGTERM: kill in-flight iterations immediately. Do not write partial results. The commit point is the flush to `runs.jsonl` — if a metadata line was flushed to disk before the signal arrived, it stays; if not, it's discarded. The lockfile is released on exit.
+
+### Worktree Lifecycle
+
+Worktrees persist across runs and are never removed automatically. This avoids re-running `setup` (e.g., `npm ci`) unnecessarily. To reclaim disk space, use `chrome-ranger clean` which removes all worktrees in `.chrome-ranger/worktrees/` and prunes them from git.
+
+### Concurrency
+
+Running two `chrome-ranger run` processes against the same project is not supported. A lockfile at `.chrome-ranger/lock` prevents this — the second invocation fails immediately with a clear error message.
 
 ## `status` Output
+
+Always shows the full matrix grid, even when no runs exist (all cells show `0/N`).
 
 ```
                main (e7f8a9b)   v4.5.0 (c3d4e5f)
@@ -131,12 +164,234 @@ Chrome 121    8/5 ✓             3/5 ...
 Chrome 122    0/5               0/5
 ```
 
+## CLI Output Format
+
+All CLI output goes to stderr — errors, progress, and status messages. This keeps stdout completely clean for composability with pipes.
+
+### Progress lines
+
+- **Warmup:** `[warmup] chrome@120 × main (e7f8a9b)` — label only, no duration or exit code (warmups are discarded)
+- **Iteration:** `[ 3/45] chrome@120 × main (e7f8a9b) #2    4523ms  exit:0` — always shows duration and exit code, whether the iteration succeeded or failed
+- **Chrome version** uses the major version in progress lines (e.g., `chrome@120`); `runs.jsonl` always stores the full version string
+
+### Phase output
+
+The `run` command outputs in phases: resolving refs, setting up worktrees, running setup, ensuring Chrome binaries, warmup, iterations, and a summary line. See the example run below for the full format.
+
+### Setup failures
+
+If setup fails for a ref, it's shown inline in the setup phase with `✗` and the ref is noted as skipped:
+
+```
+Running setup: npm ci
+  main (e7f8a9b)                 ✓  12.4s
+  feature/virtual-list (3c1d44f) ✗  exit:1
+  Skipping all iterations for feature/virtual-list
+```
+
+### Errors
+
+Errors use a prefix: `error: <message>`. No stack traces unless `DEBUG=chrome-ranger` is set.
+
 ## Tech Stack
 
 - TypeScript / Node.js
 - **commander** — CLI parsing
 - **js-yaml** — config
+- **@puppeteer/browsers** — Chrome binary download, caching, and platform detection
 - **tsup** — build/bundle
+
+## Playwright Integration
+
+Playwright accepts a custom Chrome binary via `executablePath` in its launch options. Since chrome-ranger provides `CHROME_BIN` as an environment variable, the user's Playwright config just passes it through:
+
+```typescript
+// playwright.config.ts
+export default defineConfig({
+  use: {
+    launchOptions: {
+      executablePath: process.env.CHROME_BIN,
+    },
+  },
+});
+```
+
+When `CHROME_BIN` is set, Playwright uses the provided binary instead of downloading its own. This is the intended integration point — chrome-ranger manages which Chrome binary to use, Playwright just consumes it.
+
+## Example Run
+
+This example benchmarks a React component's render performance across Chrome versions and two branches.
+
+### Project structure
+
+```
+my-app/
+├── src/
+├── tests/
+│   └── bench.spec.ts
+├── playwright.config.ts
+├── package.json
+└── chrome-ranger.yaml
+```
+
+### Config
+
+```yaml
+command: npx playwright test tests/bench.spec.ts
+setup: npm ci
+iterations: 5
+warmup: 1
+workers: 2
+
+chrome:
+  versions:
+    - "120.0.6099.109"
+    - "122.0.6261.94"
+
+code:
+  repo: .
+  refs:
+    - main
+    - feature/virtual-list
+```
+
+### Playwright config
+
+```typescript
+// playwright.config.ts
+export default defineConfig({
+  use: {
+    launchOptions: {
+      executablePath: process.env.CHROME_BIN,
+    },
+  },
+});
+```
+
+### Test script
+
+```typescript
+// tests/bench.spec.ts
+test('render 1000 rows', async ({ page }) => {
+  await page.goto('http://localhost:3000');
+  const start = performance.now();
+  await page.click('#load-data');
+  await page.waitForSelector('tr:nth-child(1000)');
+  const duration = performance.now() - start;
+  console.log(JSON.stringify({ metric: 'render_1000', ms: duration }));
+});
+```
+
+### Successful run
+
+```
+$ chrome-ranger run
+
+Resolving refs...
+  main        → e7f8a9b
+  feature/virtual-list → 3c1d44f
+
+Setting up worktrees...
+  .chrome-ranger/worktrees/main              ✓
+  .chrome-ranger/worktrees/feature-virtual-list ✓
+
+Running setup: npm ci
+  main (e7f8a9b)              ✓  12.4s
+  feature/virtual-list (3c1d44f) ✓  11.8s
+
+Ensuring Chrome binaries...
+  chrome@120.0.6099.109       ✓  cached
+  chrome@122.0.6261.94        ✓  downloading... done (48s)
+
+Running 20 iterations + 4 warmup (2 workers)
+
+  [warmup] chrome@120 × main (e7f8a9b)
+  [warmup] chrome@120 × feature/virtual-list (3c1d44f)
+  [warmup] chrome@122 × main (e7f8a9b)
+  [warmup] chrome@122 × feature/virtual-list (3c1d44f)
+  [ 1/20] chrome@120 × main (e7f8a9b) #0                    4523ms  exit:0
+  [ 2/20] chrome@120 × feature/virtual-list (3c1d44f) #0     2301ms  exit:0
+  [ 3/20] chrome@120 × main (e7f8a9b) #1                    4210ms  exit:0
+  [ 4/20] chrome@120 × feature/virtual-list (3c1d44f) #1     2455ms  exit:0
+  ...
+  [19/20] chrome@122 × feature/virtual-list (3c1d44f) #3     2189ms  exit:0
+  [20/20] chrome@122 × feature/virtual-list (3c1d44f) #4     2210ms  exit:0
+
+Done. 20 runs logged to .chrome-ranger/runs.jsonl
+```
+
+### Partial failures
+
+Failures don't abort the run. Other cells in the matrix keep going.
+
+```
+  [ 1/20] chrome@120 × main (e7f8a9b) #0                    4523ms  exit:0
+  [ 2/20] chrome@120 × feature/virtual-list (3c1d44f) #0     2301ms  exit:0
+  [ 3/20] chrome@120 × main (e7f8a9b) #1                    4210ms  exit:0
+  [ 4/20] chrome@120 × feature/virtual-list (3c1d44f) #1     3891ms  exit:1
+  [ 5/20] chrome@122 × main (e7f8a9b) #0                    4102ms  exit:0
+  ...
+
+Done. 20 runs logged to .chrome-ranger/runs.jsonl (2 failed)
+```
+
+Failed runs get the same metadata shape in `runs.jsonl` — just with a non-zero `exitCode`:
+
+```json
+{"id":"f7g8h9","chrome":"120.0.6099.109","ref":"feature/virtual-list","sha":"3c1d44f","iteration":1,"exitCode":1,"durationMs":3891}
+```
+
+stderr is captured in the output file for diagnosis:
+
+```
+$ cat .chrome-ranger/output/f7g8h9.stderr
+Error: Timed out waiting for selector "tr:nth-child(1000)"
+    at bench.spec.ts:5:15
+```
+
+`status` shows the gaps:
+
+```
+                        main (e7f8a9b)   feature/virtual-list (3c1d44f)
+Chrome 120.0.6099.109  5/5 ✓             4/5 ✗ (1 failed)
+Chrome 122.0.6261.94   4/5 ✗ (1 failed)  5/5 ✓
+```
+
+### Resuming after failure
+
+Running again only fills in the gaps — it doesn't re-run successful iterations:
+
+```
+$ chrome-ranger run
+
+Resolving refs...
+  main        → e7f8a9b  (unchanged)
+  feature/virtual-list → 3c1d44f  (unchanged)
+
+Skipping 18 completed iterations.
+Running 2 remaining iterations (2 workers)
+
+  [ 1/2] chrome@120 × feature/virtual-list (3c1d44f) #1     2344ms  exit:0
+  [ 2/2] chrome@122 × main (e7f8a9b) #1                    4198ms  exit:0
+
+Done. 2 runs logged to .chrome-ranger/runs.jsonl
+
+$ chrome-ranger status
+
+                        main (e7f8a9b)   feature/virtual-list (3c1d44f)
+Chrome 120.0.6099.109  5/5 ✓             5/5 ✓
+Chrome 122.0.6261.94   5/5 ✓             5/5 ✓
+```
+
+### Analysis
+
+chrome-ranger stops at data collection. Analysis is yours:
+
+```bash
+cat .chrome-ranger/output/*.stdout | jq -s 'group_by(.metric) | ...'
+```
+
+Or pull `runs.jsonl` into a notebook, join with stdout files, and make charts.
 
 ## What the CLI Does NOT Do
 
