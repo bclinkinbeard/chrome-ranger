@@ -40,8 +40,9 @@ export function resolveRef(repoDir: string, ref: string): string {
 export function resolveRefs(
   repoDir: string,
   refs: string[],
+  projectCwd: string,
 ): ResolvedRef[] {
-  const wtDir = worktreesDir(repoDir);
+  const wtDir = worktreesDir(projectCwd);
   const resolved: ResolvedRef[] = [];
 
   log("Resolving refs...");
@@ -61,8 +62,9 @@ export function resolveRefs(
 export function setupWorktrees(
   repoDir: string,
   resolvedRefs: ResolvedRef[],
+  projectCwd: string,
 ): void {
-  const wtDir = worktreesDir(repoDir);
+  const wtDir = worktreesDir(projectCwd);
   ensureDirExists(wtDir);
 
   log("\nSetting up worktrees...");
@@ -154,8 +156,8 @@ export async function runSetup(
   return skippedRefs;
 }
 
-export function cleanWorktrees(repoDir: string): void {
-  const wtDir = worktreesDir(repoDir);
+export function cleanWorktrees(repoDir: string, projectCwd: string): void {
+  const wtDir = worktreesDir(projectCwd);
   if (existsSync(wtDir)) {
     rmSync(wtDir, { recursive: true, force: true });
     log(`Removed worktrees at ${wtDir}`);

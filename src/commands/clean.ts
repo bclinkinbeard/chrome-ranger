@@ -13,7 +13,7 @@ export function cleanCommand(cwd: string): void {
   }
 
   try {
-    cleanWorktrees(repoDir);
+    cleanWorktrees(repoDir, cwd);
   } catch (err: unknown) {
     logError((err as Error).message);
     process.exitCode = 1;

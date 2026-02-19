@@ -84,7 +84,7 @@ export async function runCommand(
     // Resolve refs
     let allResolved: ResolvedRef[];
     try {
-      allResolved = resolveRefs(repoDir, activeRefNames);
+      allResolved = resolveRefs(repoDir, activeRefNames, cwd);
     } catch (err: unknown) {
       logError((err as Error).message);
       process.exitCode = 1;
@@ -92,7 +92,7 @@ export async function runCommand(
     }
 
     // Set up worktrees
-    setupWorktrees(repoDir, allResolved);
+    setupWorktrees(repoDir, allResolved, cwd);
 
     // Run setup if configured
     let skippedRefs = new Set<string>();
