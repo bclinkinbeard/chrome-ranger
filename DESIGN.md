@@ -44,6 +44,7 @@ The script's stdout and stderr are captured verbatim. The CLI does not parse or 
 
 ```
 .chrome-ranger/
+  lock                     # lockfile, prevents concurrent runs
   runs.jsonl              # one JSON metadata line per run, append-only
   output/
     {id}.stdout            # raw stdout per run
@@ -113,24 +114,37 @@ chrome-ranger cache clean                                 # remove cached Chrome
 
 ## Run Behavior
 
-1. Parse config, load `runs.jsonl`
-2. Compute full matrix: `chrome.versions × code.refs × [0..iterations)`
-3. Subtract completed runs → pending list
-4. For each code ref: resolve SHA, create/reuse git worktree
-5. For each Chrome version: ensure binary is downloaded and cached
-6. For each worktree that will be used: run `setup` command if configured (once per worktree, skip if already set up for this SHA)
-7. Dispatch pending runs across `workers` parallel workers:
+1. Acquire lockfile (`.chrome-ranger/lock`). If already locked, fail immediately with an error — concurrent runs against the same project are not supported.
+2. Parse config, load `runs.jsonl`
+3. Compute full matrix: `chrome.versions × code.refs × [0..iterations)`
+4. Subtract completed runs → pending list. A cell is "complete" only when it has a run with `exitCode: 0`. Failed runs (non-zero exit) stay in `runs.jsonl` as history but don't count toward completion.
+5. For each code ref: resolve SHA, create/reuse git worktree
+6. For each Chrome version: ensure binary is downloaded and cached (via `@puppeteer/browsers`)
+7. For each worktree that will be used: run `setup` command if configured (once per worktree, skip if already set up for this SHA). If setup fails for a ref, log the error and skip all iterations for that ref — other refs continue.
+8. For each (chrome, ref) cell: run warmup iterations. Warmup output is completely discarded (not written to `runs.jsonl` or the output directory). If a warmup iteration fails (non-zero exit), skip all remaining iterations for that cell and log a warning.
+9. Dispatch pending runs across `workers` parallel workers:
    - Each worker picks the next pending run from the queue
    - Spawns `command` via shell with env vars set
    - Captures stdout/stderr to `.chrome-ranger/output/{id}.*`
    - Appends metadata line to `runs.jsonl` (serialized — one writer)
+   - Run IDs are generated via `crypto.randomUUID()`
    - Prints progress: `[3/45] chrome@121 × main (e7f8a9b) #2`
-8. `--append N` skips the diff, just adds N runs to the specified cells
-9. `--replace` deletes existing runs for the targeted cells before running
+10. `--append N` skips the diff, just adds N runs to the specified cells
+11. `--replace` deletes existing runs for the targeted cells before running
+12. `--chrome` and `--refs` filters scope everything: `--replace` only clears targeted cells, `--append` only adds to targeted cells
+13. Release lockfile on exit.
 
 ### Parallelism
 
 Workers run iterations concurrently up to the configured `workers` count. Each worker receives the full environment contract. The `runs.jsonl` append is serialized to avoid interleaving. Setup commands are run before dispatching any iterations and are not parallelized — each worktree is set up exactly once.
+
+### Signal Handling
+
+On SIGINT/SIGTERM: kill in-flight iterations immediately. Do not write partial results. `runs.jsonl` only contains entries from iterations that completed before the signal. The lockfile is released on exit.
+
+### Concurrency
+
+Running two `chrome-ranger run` processes against the same project is not supported. A lockfile at `.chrome-ranger/lock` prevents this — the second invocation fails immediately with a clear error message.
 
 ## `status` Output
 
@@ -146,6 +160,7 @@ Chrome 122    0/5               0/5
 - TypeScript / Node.js
 - **commander** — CLI parsing
 - **js-yaml** — config
+- **@puppeteer/browsers** — Chrome binary download, caching, and platform detection
 - **tsup** — build/bundle
 
 ## Playwright Integration
