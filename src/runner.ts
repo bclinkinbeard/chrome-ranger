@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { createWriteStream } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { Config, RunMeta, PendingRun, ResolvedRef } from "./types.js";
@@ -57,22 +57,12 @@ async function executeCommand(
     };
     signal.addEventListener("abort", onAbort, { once: true });
 
-    let stdoutStream: ReturnType<typeof createWriteStream> | null = null;
-    let stderrStream: ReturnType<typeof createWriteStream> | null = null;
+    // Collect output chunks in memory, write to disk after process exits
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
 
-    if (stdoutPath) {
-      stdoutStream = createWriteStream(stdoutPath);
-      child.stdout.pipe(stdoutStream);
-    } else {
-      child.stdout.resume();
-    }
-
-    if (stderrPath) {
-      stderrStream = createWriteStream(stderrPath);
-      child.stderr.pipe(stderrStream);
-    } else {
-      child.stderr.resume();
-    }
+    child.stdout.on("data", (chunk: Buffer) => stdoutChunks.push(chunk));
+    child.stderr.on("data", (chunk: Buffer) => stderrChunks.push(chunk));
 
     child.on("close", (code) => {
       signal.removeEventListener("abort", onAbort);
@@ -81,6 +71,15 @@ async function executeCommand(
         return;
       }
       const durationMs = Date.now() - start;
+
+      // Write collected output to disk synchronously
+      if (stdoutPath) {
+        writeFileSync(stdoutPath, Buffer.concat(stdoutChunks));
+      }
+      if (stderrPath) {
+        writeFileSync(stderrPath, Buffer.concat(stderrChunks));
+      }
+
       resolvePromise({ exitCode: code ?? 1, durationMs });
     });
 
