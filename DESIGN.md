@@ -91,7 +91,7 @@ interface RunMeta {
   ref: string;               // git ref as specified in config
   sha: string;               // resolved commit SHA
   iteration: number;
-  timestamp: string;         // ISO 8601
+  timestamp: string;         // ISO 8601 UTC (e.g., "2026-02-18T10:30:00.000Z")
   durationMs: number;        // wall clock
   exitCode: number;
 }
@@ -108,8 +108,8 @@ chrome-ranger run [--chrome <v>] [--refs <ref>]           # fill cells to minimu
                   [--append N]                             # add N more runs to targeted cells
                   [--replace]                              # clear targeted cells, then run
 chrome-ranger status                                      # matrix completion table
-chrome-ranger list-chrome [--latest N] [--since DATE]     # query Chrome for Testing API
-chrome-ranger cache clean                                 # remove cached Chrome binaries
+chrome-ranger list-chrome [--latest N] [--since DATE]     # query Chrome for Testing API (stable channel only)
+chrome-ranger cache clean                                 # remove all cached Chrome binaries
 ```
 
 ## Run Behavior
@@ -150,12 +150,18 @@ Running two `chrome-ranger run` processes against the same project is not suppor
 
 ## `status` Output
 
+Always shows the full matrix grid, even when no runs exist (all cells show `0/N`).
+
 ```
                main (e7f8a9b)   v4.5.0 (c3d4e5f)
 Chrome 120    5/5 ✓             5/5 ✓
 Chrome 121    8/5 ✓             3/5 ...
 Chrome 122    0/5               0/5
 ```
+
+## Error Output
+
+Errors are written to stderr with a prefix: `error: <message>`. No stack traces unless `DEBUG=chrome-ranger` is set. Non-error progress output (resolving refs, setup status, iteration progress) goes to stderr as well, keeping stdout clean.
 
 ## Tech Stack
 
