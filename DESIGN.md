@@ -103,7 +103,7 @@ interface RunMeta {
 ## CLI Commands
 
 ```
-chrome-ranger init                                        # scaffold config
+chrome-ranger init [--force]                               # scaffold config (refuses if exists; --force overwrites)
 chrome-ranger run [--chrome <v>] [--refs <ref>]           # fill cells to minimum
                   [--append N]                             # add N more runs to targeted cells
                   [--replace]                              # clear targeted cells, then run
@@ -114,12 +114,12 @@ chrome-ranger cache clean                                 # remove cached Chrome
 
 ## Run Behavior
 
-1. Acquire lockfile (`.chrome-ranger/lock`). If already locked, fail immediately with an error — concurrent runs against the same project are not supported.
+1. Acquire lockfile (`.chrome-ranger/lock`). The lockfile contains the PID of the owning process. If already locked, check whether the PID is still alive — if the process is dead (crash), reclaim the lock; if alive, fail immediately with an error.
 2. Parse config, load `runs.jsonl`
 3. Compute full matrix: `chrome.versions × code.refs × [0..iterations)`
 4. Subtract completed runs → pending list. A cell is identified by `(chrome version, resolved SHA)` — if a branch advances to a new commit, old runs don't count. A cell is "complete" only when it has a run with `exitCode: 0`. Failed runs (non-zero exit) stay in `runs.jsonl` as history but don't count toward completion.
 5. For each code ref: resolve SHA, create/reuse git worktree
-6. For each Chrome version: ensure binary is downloaded and cached (via `@puppeteer/browsers`)
+6. For each Chrome version: ensure binary is downloaded and cached (via `@puppeteer/browsers`). Version strings must be exact (e.g., `"120.0.6099.109"`); no prefix matching. Use `list-chrome` to discover available versions.
 7. For each worktree that will be used: run `setup` command if configured (once per worktree, skip if already set up for this SHA). Setup tracking: after a successful setup, write a marker file `.chrome-ranger-setup-done` containing the SHA into the worktree. On subsequent runs, compare the marker SHA to the current resolved SHA — only re-run setup if they differ. `setup` runs with `cwd` set to the worktree directory. If setup fails for a ref, log the error and skip all iterations for that ref — other refs continue.
 8. Run all warmup iterations first, before any real iterations. Warmups are parallelized across workers just like real iterations. Warmup count is per (chrome, ref) cell — `warmup: 1` with a 2×2 matrix = 4 warmup iterations total. Warmup output is completely discarded (not written to `runs.jsonl` or the output directory). If a warmup iteration fails (non-zero exit), skip all remaining iterations for that cell and log a warning.
 9. Dispatch pending runs across `workers` parallel workers:
@@ -130,13 +130,15 @@ chrome-ranger cache clean                                 # remove cached Chrome
    - Run IDs are generated via `crypto.randomUUID()`
    - Prints progress: `[3/45] chrome@121 × main (e7f8a9b) #2` (where `#2` is the `ITERATION` value)
 10. `--append N` skips the diff, just adds N runs to the specified cells. Iteration numbering continues from the last iteration index (e.g., if a cell has iterations 0-4, appended runs start at iteration 5).
-11. `--replace` deletes existing runs for the targeted cells before running — both metadata lines from `runs.jsonl` and corresponding output files (`{id}.stdout`, `{id}.stderr`) are removed. Iteration numbering resets to 0 for replaced cells.
+11. `--replace` deletes existing runs for the targeted cells before running. Implementation: read all lines from `runs.jsonl`, filter out targeted entries, write back. Delete corresponding output files (`{id}.stdout`, `{id}.stderr`). Iteration numbering resets to 0 for replaced cells.
 12. `--chrome` and `--refs` filters scope everything: `--replace` only clears targeted cells, `--append` only adds to targeted cells
 13. Release lockfile on exit.
 
 ### Parallelism
 
 Workers run iterations concurrently up to the configured `workers` count. Each worker receives the full environment contract. The `runs.jsonl` append is serialized to avoid interleaving. Setup commands are run before dispatching any iterations and are not parallelized — each worktree is set up exactly once.
+
+**Shared worktrees:** Multiple workers may run concurrently in the same worktree directory (e.g., two iterations of the same ref with different Chrome versions). The user's script must handle this — for example, use `ITERATION` or a unique ID in any temp file names. This is documented in the environment contract.
 
 ### Signal Handling
 
