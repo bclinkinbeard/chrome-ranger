@@ -24,6 +24,7 @@ export async function ensureWorktree(
   projectDir: string,
   ref: string,
   sha: string,
+  repoDir: string = projectDir,
 ): Promise<Worktree> {
   const worktreesDir = path.join(projectDir, ".chrome-ranger", "worktrees");
   await fs.mkdir(worktreesDir, { recursive: true });
@@ -62,7 +63,7 @@ export async function ensureWorktree(
 
   // Create new worktree
   await execFileAsync("git", ["worktree", "add", "--detach", worktreePath, sha], {
-    cwd: projectDir,
+    cwd: repoDir,
   });
 
   return { ref, sha, path: worktreePath };

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as os from "node:os";
+import { realpathSync } from "node:fs";
 import { Writable } from "node:stream";
 import { runSetups, isSetupDone, markSetupDone } from "../setup.js";
 import type { Worktree } from "../types.js";
@@ -94,6 +95,7 @@ describe("runSetups", () => {
     const dir2 = path.join(tmpDir, "wt2");
     await fs.mkdir(dir1, { recursive: true });
     await fs.mkdir(dir2, { recursive: true });
+    const realDir1 = realpathSync(dir1);
 
     const worktrees: Worktree[] = [
       { ref: "failing", sha: "f".repeat(40), path: dir1 },
@@ -101,7 +103,7 @@ describe("runSetups", () => {
     ];
 
     const results = await runSetups(
-      'if [ "$PWD" = "' + dir1 + '" ]; then exit 1; else echo ok; fi',
+      'if [ "$PWD" = "' + realDir1 + '" ]; then exit 1; else echo ok; fi',
       worktrees,
       mockStderr,
     );

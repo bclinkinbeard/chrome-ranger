@@ -2,13 +2,14 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as os from "node:os";
+import { realpathSync } from "node:fs";
 import { runIteration } from "../runner.js";
 import type { IterationInput } from "../types.js";
 
 let tmpDir: string;
 
 beforeEach(async () => {
-  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "cr-runner-"));
+  tmpDir = realpathSync(await fs.mkdtemp(path.join(os.tmpdir(), "cr-runner-")));
 });
 
 afterEach(async () => {

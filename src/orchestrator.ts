@@ -70,7 +70,7 @@ export async function executeRun(options: RunOptions): Promise<RunSummary> {
     stderr.write("\nSetting up worktrees...\n");
     const worktrees: Worktree[] = [];
     for (const { ref, sha } of resolvedRefs) {
-      const wt = await ensureWorktree(projectDir, ref, sha);
+      const wt = await ensureWorktree(projectDir, ref, sha, config.code.repo);
       stderr.write(`  ${wt.path}              ✓\n`);
       worktrees.push(wt);
     }
