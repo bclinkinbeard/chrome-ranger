@@ -4,7 +4,7 @@
 
 Progressive disclosure: overview first, detail on demand. The terminal is split into two regions -- a pinned header that shows the matrix overview, and a scrolling log below it that streams individual iteration results as they complete. You get the bird's-eye view and the ground-level detail simultaneously, and the scrolling log survives the run as scrollback history.
 
-The tradeoff is explicit: you accept the complexity of ANSI scroll regions and a taller display in exchange for real-time per-iteration visibility. When an iteration fails, you see it immediately in the log with its duration and exit code -- you do not have to wait for the run to finish or inspect a separate command to understand what happened. The scrolling log also serves as a natural audit trail: after the run, scrolling up reveals the full chronological history of every iteration.
+The tradeoff is explicit: you accept the complexity of ANSI scroll regions and a taller display in exchange for real-time per-iteration visibility. When an iteration fails, you see it immediately in the log -- the `FAIL` line breaks the visual rhythm of passing iterations, and a brief stderr excerpt follows inline so you can decide whether to abort the run without waiting for it to finish. The scrolling log also serves as a natural audit trail: after the run, scrolling up reveals the full chronological history of every iteration.
 
 ---
 
@@ -127,16 +127,22 @@ Elapsed time ticks up live. When workers finish (near end of run with only 1-2 a
 Each completed iteration produces one line below the separator:
 
 ```
-  [ 3/45] chrome@120 x main (e7f8a9b) #1                  4210ms  exit:0
+  [ 3/45] chrome@120 x main (e7f8a9b) #1                  4210ms
 ```
 
-Failed iterations are red with a `FAIL` suffix:
+Successful lines show only the cell identifier and duration -- no exit code, no suffix. The absence of `FAIL` is the success signal. This keeps the common case compact and makes failures pop visually.
+
+Failed iterations are red with a `FAIL` suffix, followed by an inline stderr excerpt (last 2 lines, indented):
 
 ```
-  [21/45] chrome@120 x v5.0.0-beta.1 (f9a0b1c) #2        2455ms  exit:1  FAIL
+  [21/45] chrome@120 x v5.0.0-beta.1 (f9a0b1c) #2        2455ms  FAIL
+          Error: Timed out waiting for selector "tr:nth-child(1000)"
+              at bench.spec.ts:5:15
 ```
 
-Log lines use full ref names and include the resolved SHA. They are self-contained (each line has all the context needed to understand what happened).
+The inline stderr gives the operator enough context to decide whether to abort (Ctrl+C) without waiting for the run to finish. If the error is transient (e.g., a timeout), the run can continue. If the error is structural (e.g., missing file, syntax error), the operator can kill immediately. Stderr is truncated to the last 2 lines; full output is always available in `.chrome-ranger/output/{id}.stderr`.
+
+Log lines use full ref names and include the resolved SHA. They are self-contained.
 
 ### Separator
 
@@ -183,19 +189,19 @@ chrome-ranger run  6/45  13%  elapsed 0:41
  w1 chrome@120 x v4.5.0 #2        3.1s    w3 (idle)
  w2 chrome@121 x main #2          1.8s    w4 (idle)
 ---
-  [ 1/45] chrome@120 x main (e7f8a9b) #0                  4523ms  exit:0
-  [ 2/45] chrome@120 x main (e7f8a9b) #1                  4210ms  exit:0
-  [ 3/45] chrome@121 x main (e7f8a9b) #0                  4102ms  exit:0
-  [ 4/45] chrome@121 x main (e7f8a9b) #1                  4198ms  exit:0
-  [ 5/45] chrome@120 x v4.5.0 (c3d4e5f) #0                3891ms  exit:0
-  [ 6/45] chrome@120 x v4.5.0 (c3d4e5f) #1                3744ms  exit:0
+  [ 1/45] chrome@120 x main (e7f8a9b) #0                  4523ms
+  [ 2/45] chrome@120 x main (e7f8a9b) #1                  4210ms
+  [ 3/45] chrome@121 x main (e7f8a9b) #0                  4102ms
+  [ 4/45] chrome@121 x main (e7f8a9b) #1                  4198ms
+  [ 5/45] chrome@120 x v4.5.0 (c3d4e5f) #0                3891ms
+  [ 6/45] chrome@120 x v4.5.0 (c3d4e5f) #1                3744ms
 ```
 
 Header: 9 lines. The block bars are 5 characters wide (1:1 with iterations). Not-started cells and their bars are dim. Idle workers are shown dimmed in parentheses -- they appear because not all workers have been dispatched yet. Once all workers are busy, idle entries disappear.
 
 Width: `" chrome@122  main █████ 5/5   v4.5.0 █████ 5/5   v5.0.0-b █████ 5/5"` = ~74 characters. Fits at 80 columns.
 
-The scrolling log below `---` shows each completed iteration with its full cell identifier, duration, and exit code. You can already see that `chrome@120 x main` iterations are taking ~4200-4500ms.
+The scrolling log below `---` shows each completed iteration with its full cell identifier and duration. You can already see that `chrome@120 x main` iterations are taking ~4200-4500ms.
 
 ### Mid-run with 1 failure (28/45 done)
 
@@ -209,21 +215,23 @@ chrome-ranger run  28/45  62%  elapsed 2:14                         1 failed
  w1 chrome@121 x v4.5.0 #3        2.4s    w3 chrome@122 x main #4          0.6s
  w2 chrome@121 x v5.0.0-b #1      4.1s    w4 chrome@122 x v5.0.0-b #1     3.2s
 ---
-  [21/45] chrome@120 x v5.0.0-beta.1 (f9a0b1c) #2        2455ms  exit:1  FAIL
-  [22/45] chrome@121 x main (e7f8a9b) #4                  4088ms  exit:0
-  [23/45] chrome@120 x v5.0.0-beta.1 (f9a0b1c) #3        2189ms  exit:0
-  [24/45] chrome@121 x v4.5.0 (c3d4e5f) #1                3291ms  exit:0
-  [25/45] chrome@122 x main (e7f8a9b) #2                  4301ms  exit:0
-  [26/45] chrome@121 x v4.5.0 (c3d4e5f) #2                3402ms  exit:0
-  [27/45] chrome@122 x main (e7f8a9b) #3                  4102ms  exit:0
-  [28/45] chrome@121 x v5.0.0-beta.1 (f9a0b1c) #0        2102ms  exit:0
+  [21/45] chrome@120 x v5.0.0-beta.1 (f9a0b1c) #2        2455ms  FAIL
+          Error: Timed out waiting for selector "tr:nth-child(1000)"
+              at bench.spec.ts:5:15
+  [22/45] chrome@121 x main (e7f8a9b) #4                  4088ms
+  [23/45] chrome@120 x v5.0.0-beta.1 (f9a0b1c) #3        2189ms
+  [24/45] chrome@121 x v4.5.0 (c3d4e5f) #1                3291ms
+  [25/45] chrome@122 x main (e7f8a9b) #2                  4301ms
+  [26/45] chrome@121 x v4.5.0 (c3d4e5f) #2                3402ms
+  [27/45] chrome@122 x main (e7f8a9b) #3                  4102ms
+  [28/45] chrome@121 x v5.0.0-beta.1 (f9a0b1c) #0        2102ms
 ```
 
 Key details:
 - `███✗░ 3/5 ✗1` -- the `✗` (red) occupies the 4th bar position, showing exactly which iteration failed. The suffix `✗1` gives the count. The fraction `3/5` counts only passes.
 - Complete cells: `█████ 5/5 ✓` (green). You can scan the matrix for non-`✓` cells to find what needs attention.
 - `1 failed` in the header is right-aligned and red.
-- In the scrolling log, iteration 21 (the failure) is rendered in red with `FAIL`. You can see its duration (2455ms) and exit code immediately. You can also see that subsequent iterations on the same cell (#3, 2189ms) passed -- the failure was transient.
+- In the scrolling log, iteration 21 (the failure) is rendered in red with `FAIL`, and the stderr excerpt appears inline immediately below it. You can see the error is a timeout on a CSS selector -- likely transient, no need to abort. Subsequent iterations on the same cell (#3, 2189ms) confirm it passed.
 - All 4 workers are active. Worker w2 at 4.1s is the longest-running.
 
 ### Complete with 2 failures (45/45)
@@ -283,10 +291,12 @@ chrome-ranger run  80/240  33%  elapsed 4:38                       3 failed
  w2 chrome@122 x main #3        3.6s    w5 chrome@120 x feat/vl #7   4.1s
  w3 chrome@121 x feat/vl #6     2.8s    w6 chrome@120 x v5.0.0-b #9  1.7s
 ---
-  [ 77/240] chrome@120 x v5.0.0-beta.1 (f9a0b1c) #7      2301ms  exit:0
-  [ 78/240] chrome@118 x feature/virtual-list (a1b2c3d) #6  2891ms  exit:1  FAIL
-  [ 79/240] chrome@121 x v4.5.0 (c3d4e5f) #6              3402ms  exit:0
-  [ 80/240] chrome@120 x v5.0.0-beta.1 (f9a0b1c) #8       2189ms  exit:0
+  [ 77/240] chrome@120 x v5.0.0-beta.1 (f9a0b1c) #7      2301ms
+  [ 78/240] chrome@118 x feature/virtual-list (a1b2c3d) #6  2891ms  FAIL
+            Error: Timed out waiting for selector "tr:nth-child(1000)"
+                at bench.spec.ts:5:15
+  [ 79/240] chrome@121 x v4.5.0 (c3d4e5f) #6              3402ms
+  [ 80/240] chrome@120 x v5.0.0-beta.1 (f9a0b1c) #8       2189ms
 ```
 
 Header: 13 lines. Bars are 10 characters wide (1:1 with iterations). Each matrix line is ~115 characters at full width -- fits 120-column terminals.
@@ -295,7 +305,7 @@ Key details:
 - Complete cells: `██████████ 10 ✓` (denominator dropped for compactness)
 - The `✗` in `chrome@118 x feat/vl`'s bar shows exactly where the failure occurred (position 7, zero-indexed iteration #6)
 - All 6 workers active, packed into 3 lines
-- The scrolling log shows iteration 78 as a `FAIL` in red -- you can see the exit code and duration immediately without waiting for the run to finish
+- The scrolling log shows iteration 78 as a `FAIL` in red with an inline stderr excerpt -- you can immediately see the error and decide whether to abort
 - Log lines use full ref names (`feature/virtual-list`, `v5.0.0-beta.1`) even though the header abbreviates them
 
 **100-column fallback:** At terminals narrower than 120 columns, bars shrink to 5 characters (each block = 2 iterations):
@@ -364,6 +374,67 @@ $ chrome-ranger status
 ```
 
 The bars have grown from 5 to 8 characters, reflecting the new target (original 5 + appended 3). The failure positions are preserved in the expanded bar.
+
+### Heat map view (`status --compact`)
+
+For large matrices or narrow terminals, a single-character-per-cell heat map gives instant pattern recognition:
+
+```
+$ chrome-ranger status --compact
+
+             main  v4.5.0  v5.0.0-b  feat/vl
+chrome@118    █     █       █         ✗
+chrome@119    █     █       █         ▓
+chrome@120    █     █       ▓         ░
+chrome@121    █     ▓       ▒         ░
+chrome@122    ▓     ▒       ░         ░
+chrome@123    ▒     ░       ░         ░
+
+  80/240 complete (33%), 1 cell with failures
+
+█ complete  ▓ >50%  ▒ started  ░ empty  ✗ has failures
+```
+
+Each cell is a single character based on completion state:
+
+| Glyph | Meaning | Color |
+|---|---|---|
+| `█` | All iterations passed | Green |
+| `▓` | >50% complete, no failures | White |
+| `▒` | Started (>0%), no failures | Dim |
+| `░` | Not started | Dim |
+| `✗` | Has at least one failure (any completion %) | Red |
+
+The `✗` glyph takes priority over completion state -- if a cell has any failure, it always shows `✗` regardless of how many iterations have passed. This makes failure patterns instantly visible: "all failures in the `feat/vl` column" or "failures only on chrome@121" jump out from the single-character grid.
+
+**When to use:** `--compact` is useful for matrices larger than ~4x3, where the full bar display exceeds terminal width or becomes visually dense. It is also the automatic fallback at 60-79 terminal columns (see terminal sizing).
+
+Complete, all pass:
+
+```
+$ chrome-ranger status --compact
+
+             main  v4.5.0  v5.0.0-b
+chrome@120    █     █       █
+chrome@121    █     █       █
+chrome@122    █     █       █
+
+  45/45 complete, all passed
+```
+
+Complete with failures:
+
+```
+$ chrome-ranger status --compact
+
+             main  v4.5.0  v5.0.0-b
+chrome@120    █     █       ✗
+chrome@121    █     █       █
+chrome@122    █     █       ✗
+
+  45/45 complete, 2 failed in 2 cells
+  Failures in: chrome@120 x v5.0.0-beta.1, chrome@122 x v5.0.0-beta.1
+```
 
 ---
 
@@ -671,18 +742,20 @@ chrome-ranger status --json | python3 -c "
 When `!process.stderr.isTTY`, no ANSI codes are emitted. The pinned header is skipped entirely. Output is the scrolling log only -- one line per completed iteration:
 
 ```
-[  1/45] chrome@120 x main (e7f8a9b) #0                  4523ms  exit:0
-[  2/45] chrome@120 x main (e7f8a9b) #1                  4210ms  exit:0
-[  3/45] chrome@121 x main (e7f8a9b) #0                  4102ms  exit:0
+[  1/45] chrome@120 x main (e7f8a9b) #0                  4523ms
+[  2/45] chrome@120 x main (e7f8a9b) #1                  4210ms
+[  3/45] chrome@121 x main (e7f8a9b) #0                  4102ms
 ...
-[21/45] chrome@120 x v5.0.0-beta.1 (f9a0b1c) #2         2455ms  exit:1  FAIL
+[21/45] chrome@120 x v5.0.0-beta.1 (f9a0b1c) #2         2455ms  FAIL
+        Error: Timed out waiting for selector "tr:nth-child(1000)"
+            at bench.spec.ts:5:15
 ...
-[45/45] chrome@122 x v4.5.0 (c3d4e5f) #4                3802ms  exit:0
+[45/45] chrome@122 x v4.5.0 (c3d4e5f) #4                3802ms
 
 45 runs logged to .chrome-ranger/runs.jsonl (2 failed)
 ```
 
-This is identical to the scrolling log portion of the TTY display. The non-TTY fallback is a natural subset of the full display, not a separate format.
+This is identical to the scrolling log portion of the TTY display. The non-TTY fallback is a natural subset of the full display, not a separate format. Inline stderr excerpts are included for failures even in non-TTY mode, since this is the only feedback the operator gets in CI.
 
 ---
 
@@ -706,7 +779,7 @@ Checked once at startup and on `SIGWINCH`.
 | >= 120 | Full bar width (1:1 with iterations, up to 10 chars), full ref names |
 | 100-119 | Bars at 5 chars (1:2 mapping for 10 iterations), abbreviated ref names |
 | 80-99 | Bars at 5 chars, aggressive ref abbreviation, workers on 1 line |
-| 60-79 | No bars. Matrix shows fractions only: `chrome@120  main 5/5 ✓  v4.5.0 3/5` |
+| 60-79 | Heat map mode: single-character-per-cell grid (see `status --compact`), workers on 1 line |
 | < 60 | Fall back to non-TTY sequential log |
 
 Bar width decision is made once at startup. The formula:
@@ -787,16 +860,16 @@ Log lines are written via normal `process.stderr.write()` and scroll naturally. 
 
 ### What you gain
 
-- **Real-time per-iteration visibility.** Every iteration result (duration, exit code) appears in the scrolling log as it completes. When something fails, you see it immediately with context -- no waiting for the run to finish.
+- **Real-time per-iteration visibility.** Every iteration result appears in the scrolling log as it completes. When something fails, the `FAIL` line is followed by an inline stderr excerpt -- you can read the error and decide whether to abort immediately, without waiting for the run to finish or running a separate command.
 - **Scrollback history.** After the run, scrolling up reveals the complete chronological record of every iteration. This is a natural audit trail that requires no separate command to access.
 - **Duration awareness during the run.** The scrolling log shows durations as iterations complete. You can spot performance regressions in real time (e.g., "iterations on this ref are 2x slower than expected") without waiting for `--json` output.
 - **Graceful non-TTY degradation.** The non-TTY fallback is literally the scrolling log portion of the full display. The same format works in CI, in pipes, and in terminals -- it is a subset, not a separate mode.
-- **Progressive disclosure.** The header gives the shape (which cells are done, where failures are). The log gives the detail (which specific iteration, how long, what exit code). Both are on screen simultaneously without interfering with each other.
+- **Progressive disclosure.** The header gives the shape (which cells are done, where failures are). The log gives the detail (which specific iteration, how long, what went wrong). Both are on screen simultaneously without interfering with each other.
 
 ### What you give up
 
 - **Terminal complexity.** ANSI scroll regions are the most fragile terminal mechanism in common use. A crash or SIGKILL can leave the terminal in a broken state requiring `reset`. The implementation must handle SIGWINCH (resize), cleanup on every exit path, and the edge case where the header height changes during the run.
 - **Taller display.** The minimum useful display is header (9-13 lines) plus at least a few visible log lines. On a 24-line terminal with a 9-line header, that leaves 15 lines for the log -- adequate. On a 15-line terminal, the header alone consumes 9 lines, leaving only 6 for the log. Below that, the header must be dropped entirely.
 - **Cognitive split.** Information lives in two places: the header (aggregate) and the log (detail). When investigating a failure, you look at the matrix to see which cell, then scan the log to find the specific iteration. This two-region design is more powerful but requires more active attention than a single grid.
-- **Width pressure.** Each matrix row contains inline bars for every ref, which is wider than bare fractions. A 6x4 matrix with 10-char bars needs ~115 columns. Narrow terminals force bar compression or removal.
+- **Width pressure.** Each matrix row contains inline bars for every ref, which is wider than bare fractions. A 6x4 matrix with 10-char bars needs ~115 columns. Narrow terminals fall back to the heat map (single character per cell), which fits any matrix at 60+ columns but loses count precision.
 - **No history of the header itself.** The header is redrawn in place -- you cannot scroll up to see what the matrix looked like 5 minutes ago. The log provides temporal history, but the spatial overview (the matrix) is ephemeral.
