@@ -8,6 +8,7 @@ import { acquireLock } from "./lockfile.js";
 import { buildMatrix, computePending, type MatrixCell, type RunMeta } from "./matrix.js";
 import { loadRuns, appendRun, writeRuns } from "./runs.js";
 import { resolveRef, ensureWorktree, refToDirName } from "./worktree.js";
+import { LiveDisplay } from "./display.js";
 
 export interface RunOptions {
   chrome?: string[];
@@ -311,11 +312,33 @@ export async function executeRun(ctx: RunContext): Promise<void> {
       return;
     }
 
+    // Determine unique cells for warmup count
+    const uniqueCells = new Set<string>();
+    for (const cell of pending) {
+      uniqueCells.add(`${cell.chrome}|${cell.ref}`);
+    }
+
+    // Create live display
+    const display = new LiveDisplay(
+      {
+        chromeVersions: activeVersions,
+        refs: activeRefs,
+        iterations: config.iterations,
+        warmupTotal: uniqueCells.size * config.warmup,
+        totalIterations: pending.length,
+        workers: config.workers,
+        isTTY: process.stderr.isTTY === true,
+        columns: process.stderr.columns,
+        rows: process.stderr.rows,
+      },
+      (msg) => process.stderr.write(msg)
+    );
+
     // Dispatch iterations across workers
     const queue = [...pending];
-    let completed = 0;
     const total = pending.length;
     const workers: Promise<void>[] = [];
+    const runStartTime = Date.now();
 
     for (let w = 0; w < config.workers; w++) {
       workers.push(
@@ -335,8 +358,16 @@ export async function executeRun(ctx: RunContext): Promise<void> {
               ITERATION: String(cell.iteration),
             };
 
+            const major = cell.chrome.split(".")[0];
+            display.setWorkerActive(
+              w + 1,
+              `chrome@${major} x ${cell.ref} #${cell.iteration}`
+            );
+
             const timestamp = new Date().toISOString();
             const result = await spawnIteration(config.command, env, wtPath);
+
+            display.setWorkerIdle(w + 1);
 
             // Write output files
             fs.writeFileSync(
@@ -363,22 +394,23 @@ export async function executeRun(ctx: RunContext): Promise<void> {
             // Serialized append
             await serializedAppend(jsonlPath, runMeta);
 
-            completed++;
-            const major = cell.chrome.split(".")[0];
-            log(
-              `  [${String(completed).padStart(String(total).length)}/${total}] chrome@${major} × ${cell.ref} (${cell.sha.slice(0, 7)}) #${cell.iteration}    ${result.durationMs}ms  exit:${result.exitCode}`
-            );
+            display.onIterationComplete({
+              chrome: cell.chrome,
+              ref: cell.ref,
+              sha: cell.sha,
+              iteration: cell.iteration,
+              durationMs: result.durationMs,
+              exitCode: result.exitCode,
+              stderr: result.exitCode !== 0 ? result.stderr : undefined,
+            });
           }
         })()
       );
     }
 
     await Promise.all(workers);
-
-    const allRuns = loadRuns(jsonlPath);
-    const failed = allRuns.filter((r) => r.exitCode !== 0).length;
-    const suffix = failed > 0 ? ` (${failed} failed)` : "";
-    log(`Done. ${total} runs logged to .chrome-ranger/runs.jsonl${suffix}`);
+    display.onComplete(Date.now() - runStartTime);
+    display.destroy();
   } finally {
     releaseLock();
   }
