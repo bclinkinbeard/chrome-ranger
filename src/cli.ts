@@ -5,7 +5,9 @@ import { parseConfig } from "./config.js";
 import { initConfig } from "./init.js";
 import { executeRun } from "./runner.js";
 import { loadRuns } from "./runs.js";
-import { formatStatus } from "./status.js";
+import { formatStatusBars, formatStatusCompact } from "./status-display.js";
+import { formatFailures } from "./failures.js";
+import { formatStatusJson } from "./status-json.js";
 import { resolveRef } from "./worktree.js";
 import { listChromeVersions, cacheClean, getCacheDir } from "./chrome.js";
 import { cleanWorktrees } from "./worktree.js";
@@ -91,10 +93,14 @@ program
 program
   .command("status")
   .description("Show matrix completion status")
-  .action(async () => {
+  .option("--failures", "Show detailed failure report", false)
+  .option("--json", "Output as JSON to stdout", false)
+  .option("--compact", "Show compact heat map view", false)
+  .action(async (opts) => {
     const config = loadConfigFromDisk(process.cwd());
     const projectDir = process.cwd();
     const jsonlPath = path.join(projectDir, ".chrome-ranger", "runs.jsonl");
+    const outputDir = path.join(projectDir, ".chrome-ranger", "output");
     const runs = loadRuns(jsonlPath);
 
     // Resolve SHAs for display
@@ -108,8 +114,28 @@ program
       }
     }
 
-    const output = formatStatus(config, runs, shaMap);
-    log(output);
+    if (opts.json) {
+      const result = formatStatusJson(config, runs, shaMap);
+      process.stdout.write(JSON.stringify(result, null, 2) + "\n");
+    } else if (opts.failures) {
+      // Load stderr files for failed runs
+      const stderrMap = new Map<string, string>();
+      for (const run of runs) {
+        if (run.exitCode !== 0) {
+          const stderrPath = path.join(outputDir, `${run.id}.stderr`);
+          try {
+            stderrMap.set(run.id, fs.readFileSync(stderrPath, "utf-8"));
+          } catch {
+            // stderr file may not exist
+          }
+        }
+      }
+      log(formatFailures(config, runs, shaMap, stderrMap));
+    } else if (opts.compact) {
+      log(formatStatusCompact(config, runs, shaMap));
+    } else {
+      log(formatStatusBars(config, runs, shaMap));
+    }
   });
 
 // list-chrome
