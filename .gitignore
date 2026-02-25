@@ -1,3 +1,4 @@
 node_modules/
 dist/
 .chrome-ranger/
+examples/**/lit/

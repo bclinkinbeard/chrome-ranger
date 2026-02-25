@@ -84,10 +84,17 @@ describe("Lit Bench Example", () => {
       expect(config.code.refs).toContain("lit@3.2.0");
     });
 
-    it("repo points at the cloned Lit directory", () => {
+    it("repo is current directory (run from inside the clone)", () => {
       const raw = readFileSync(resolve(EXAMPLE_DIR, "chrome-ranger.yaml"), "utf-8");
       const config = parseConfig(raw);
-      expect(config.code.repo).toBe("./lit");
+      expect(config.code.repo).toBe(".");
+    });
+
+    it("setup copies bench.sh into worktrees", () => {
+      const raw = readFileSync(resolve(EXAMPLE_DIR, "chrome-ranger.yaml"), "utf-8");
+      const config = parseConfig(raw);
+      expect(config.setup).toContain("bench.sh");
+      expect(config.setup).toContain("cp");
     });
   });
 

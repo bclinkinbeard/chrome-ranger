@@ -1,5 +1,7 @@
 command: bash bench.sh
-setup: npm ci && npm run build
+# bench.sh isn't in the Lit repo, so setup copies it from project root into each worktree.
+# Worktrees live at .chrome-ranger/worktrees/<ref>/, 3 levels below project root.
+setup: cp ../../../bench.sh . && npm ci && npm run build
 iterations: 5
 warmup: 1
 workers: 1          # benchmarks are timing-sensitive; parallelism skews results
@@ -10,7 +12,7 @@ chrome:
     - "134.0.6998.35"
 
 code:
-  repo: ./lit
+  repo: .
   refs:
     - "lit@3.0.0"
     - "lit@3.2.0"
