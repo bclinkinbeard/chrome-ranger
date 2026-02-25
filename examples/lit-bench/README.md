@@ -25,30 +25,26 @@ Total: 4 cells x 5 iterations = 20 runs + 4 warmup = 24 script executions.
 
 ## Setup
 
-1. Clone Lit:
+Run the setup script — it clones Lit and copies the config + bench script into the clone:
 
-   ```bash
-   git clone https://github.com/lit/lit.git && cd lit
-   ```
+```bash
+./setup.sh
+cd lit
+```
 
-2. Copy the example files into the clone root:
+Optionally find different Chrome versions to test against:
 
-   ```bash
-   cp /path/to/chrome-ranger/examples/lit-bench/chrome-ranger.yaml .
-   cp /path/to/chrome-ranger/examples/lit-bench/bench.sh .
-   ```
+```bash
+chrome-ranger list-chrome --latest 10
+```
 
-3. Find available Chrome versions:
+Then update `chrome.versions` in `chrome-ranger.yaml` with exact version strings from the output above.
 
-   ```bash
-   chrome-ranger list-chrome --latest 10
-   ```
-
-4. Update `chrome.versions` in `chrome-ranger.yaml` with exact version strings from the output above.
-
-5. Optionally adjust `code.refs` to compare different Lit releases. Tags use the monorepo format: `lit@3.0.0`, `lit@3.1.0`, etc.
+You can also adjust `code.refs` to compare different Lit releases. Tags use the monorepo format: `lit@3.0.0`, `lit@3.1.0`, etc.
 
 ## Run
+
+From inside the `lit/` directory:
 
 ```bash
 chrome-ranger run

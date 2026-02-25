@@ -10,7 +10,7 @@ chrome:
     - "134.0.6998.35"
 
 code:
-  repo: .
+  repo: ./lit
   refs:
     - "lit@3.0.0"
     - "lit@3.2.0"

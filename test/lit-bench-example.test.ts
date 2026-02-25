@@ -84,10 +84,10 @@ describe("Lit Bench Example", () => {
       expect(config.code.refs).toContain("lit@3.2.0");
     });
 
-    it("repo is set to current directory", () => {
+    it("repo points at the cloned Lit directory", () => {
       const raw = readFileSync(resolve(EXAMPLE_DIR, "chrome-ranger.yaml"), "utf-8");
       const config = parseConfig(raw);
-      expect(config.code.repo).toBe(".");
+      expect(config.code.repo).toBe("./lit");
     });
   });
 
@@ -151,6 +151,56 @@ describe("Lit Bench Example", () => {
     });
   });
 
+  describe("setup.sh", () => {
+    it("exists and is readable", () => {
+      const content = readFileSync(resolve(EXAMPLE_DIR, "setup.sh"), "utf-8");
+      expect(content).toBeTruthy();
+    });
+
+    it("starts with bash shebang", () => {
+      const content = readFileSync(resolve(EXAMPLE_DIR, "setup.sh"), "utf-8");
+      expect(content.startsWith("#!/usr/bin/env bash\n")).toBe(true);
+    });
+
+    it("uses strict mode (set -euo pipefail)", () => {
+      const content = readFileSync(resolve(EXAMPLE_DIR, "setup.sh"), "utf-8");
+      expect(content).toContain("set -euo pipefail");
+    });
+
+    it("clones the Lit repo from GitHub", () => {
+      const content = readFileSync(resolve(EXAMPLE_DIR, "setup.sh"), "utf-8");
+      expect(content).toContain("git clone");
+      expect(content).toContain("github.com/lit/lit");
+    });
+
+    it("clones into ./lit relative to script directory", () => {
+      const content = readFileSync(resolve(EXAMPLE_DIR, "setup.sh"), "utf-8");
+      expect(content).toMatch(/lit(\.git)?"?\s/);
+    });
+
+    it("resolves its own directory for reliable paths", () => {
+      const content = readFileSync(resolve(EXAMPLE_DIR, "setup.sh"), "utf-8");
+      expect(content).toContain("SCRIPT_DIR");
+      expect(content).toContain("dirname");
+    });
+
+    it("copies chrome-ranger.yaml into the clone", () => {
+      const content = readFileSync(resolve(EXAMPLE_DIR, "setup.sh"), "utf-8");
+      expect(content).toContain("chrome-ranger.yaml");
+      expect(content).toMatch(/cp\b/);
+    });
+
+    it("copies bench.sh into the clone", () => {
+      const content = readFileSync(resolve(EXAMPLE_DIR, "setup.sh"), "utf-8");
+      expect(content).toContain("bench.sh");
+    });
+
+    it("prints a ready message with next steps", () => {
+      const content = readFileSync(resolve(EXAMPLE_DIR, "setup.sh"), "utf-8");
+      expect(content).toContain("chrome-ranger run");
+    });
+  });
+
   describe("README.md", () => {
     it("exists and is readable", () => {
       const content = readFileSync(resolve(EXAMPLE_DIR, "README.md"), "utf-8");
@@ -172,11 +222,10 @@ describe("Lit Bench Example", () => {
       expect(content).toMatch(/Node\.?js.*18/i);
     });
 
-    it("has Setup section with clone instructions", () => {
+    it("has Setup section referencing setup.sh", () => {
       const content = readFileSync(resolve(EXAMPLE_DIR, "README.md"), "utf-8");
       expect(content).toMatch(/##\s+.*Setup/i);
-      expect(content).toContain("git clone");
-      expect(content).toContain("github.com/lit/lit");
+      expect(content).toContain("setup.sh");
     });
 
     it("mentions list-chrome for finding versions", () => {
