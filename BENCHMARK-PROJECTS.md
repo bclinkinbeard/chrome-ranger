@@ -6,17 +6,6 @@ Open-source projects with browser-based benchmark suites in their repos. Organiz
 
 Automated browser benchmarks that support pointing at a custom Chrome binary with little or no modification.
 
-### React (`facebook/react`)
-
-- **URL:** https://github.com/facebook/react
-- **Benchmarks:** `scripts/bench/`
-- **Runner:** Lighthouse + `chrome-launcher`
-- **Custom Chrome:** `CHROME_PATH` env var (native to chrome-launcher)
-- **Measures:** First Meaningful Paint, User Timings (performance marks), rendering duration
-- **Scenarios:** Hacker News clone, class components, functional components, direct `createElement`
-- **Why it fits:** Cleanest integration path. `CHROME_PATH=$CHROME_BIN yarn start` just works. No chromedriver version coupling. Supports `--headless` and `--benchmark=<name>` flags.
-- **Run:** `CHROME_PATH=$CHROME_BIN yarn --cwd scripts/bench start --headless`
-
 ### Lit (`lit/lit`)
 
 - **URL:** https://github.com/lit/lit
@@ -60,6 +49,17 @@ Automated browser benchmarks that support pointing at a custom Chrome binary wit
 ## Tier 2: Good Fit (minor patching needed)
 
 Browser benchmarks that need a small code change to accept a custom Chrome binary.
+
+### React (`facebook/react`)
+
+- **URL:** https://github.com/facebook/react
+- **Benchmarks:** `scripts/bench/`
+- **Runner:** Lighthouse 3.x + `chrome-launcher` 0.10.x
+- **Custom Chrome:** Does **not** natively support custom binaries. `chrome-launcher` expects Chrome/Chromium in the system PATH, not via env var. Would need a patch to pass `chromePath` to `chromeLauncher.launch()`.
+- **Measures:** First Meaningful Paint, User Timings (performance marks), rendering duration
+- **Scenarios:** Hacker News clone, class components, functional components, direct `createElement`
+- **Caveats:** Benchmark dependencies are from ~2018. `lighthouse@^3.2.1` and `chrome-launcher@^0.10.5` have significant API drift from current versions. Requires `xvfb` on Linux for non-headless mode. The `nodegit` dependency can be difficult to install.
+- **Run:** `yarn --cwd scripts/bench start --headless`
 
 ### styled-components (`styled-components/styled-components`)
 
@@ -113,28 +113,10 @@ These projects were checked but have no browser-based benchmark suites in their 
 
 ## Recommendations
 
-**React** is the best first target. `chrome-launcher` natively reads `CHROME_PATH`, there's no chromedriver coupling, setup is simple, and the benchmark scenarios are well-defined. Example chrome-ranger config:
+**Lit** is the best first target. Tachometer's `browser.binary` config is a first-class feature — no patching needed. The chromedriver version-matching friction can be handled by installing the matching chromedriver via `@puppeteer/browsers` in the bench script. See PLAN.md for the full example design.
 
-```yaml
-command: CHROME_PATH=$CHROME_BIN yarn --cwd scripts/bench start --headless
-setup: yarn install
-iterations: 10
-warmup: 2
-
-chrome:
-  versions:
-    - "120.0.6099.109"
-    - "130.0.6723.58"
-
-code:
-  repo: .
-  refs:
-    - main
-    - v18.3.1
-```
-
-**Lit** is the simplest integration if chromedriver version matching is handled. Tachometer configs are already structured for automated comparison.
+**js-framework-benchmark** is the canonical benchmark runner — it accepts `--chromeBinary` natively and uses Puppeteer (no chromedriver coupling). Good for validating chrome-ranger but less compelling as an example since it's a benchmark tool, not a library.
 
 **styled-components** is appealing for cross-library comparison (CSS-in-JS performance across Chrome versions) with a one-line Puppeteer patch.
 
-**js-framework-benchmark** is the canonical benchmark runner — it was practically built for this use case and already accepts `--chromeBinary`.
+**React** was initially considered the best fit but deeper investigation revealed its benchmark suite uses 2018-era dependencies and does not support custom Chrome binaries without patching.
